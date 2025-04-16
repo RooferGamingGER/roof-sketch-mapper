@@ -6,6 +6,12 @@ import { MAPBOX_TOKEN } from '../config/mapbox';
 export type DrawMode = 'draw' | 'edit' | 'delete' | null;
 export type MapFeature = GeoJSON.Feature;
 
+interface Measurement {
+  id: string;
+  area: number;
+  perimeter: number;
+}
+
 interface MapContextType {
   mapboxToken: string;  // We keep this for compatibility
   drawMode: DrawMode;
@@ -26,6 +32,10 @@ interface MapContextType {
     perimeter: number | null;
   };
   setMeasurementResults: (results: { area: number | null; perimeter: number | null }) => void;
+  allMeasurements: Measurement[];
+  addMeasurement: (id: string, area: number, perimeter: number) => void;
+  updateMeasurement: (id: string, area: number, perimeter: number) => void;
+  deleteMeasurement: (id: string) => void;
 }
 
 const MapContext = createContext<MapContextType | undefined>(undefined);
@@ -43,6 +53,7 @@ export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     area: null,
     perimeter: null,
   });
+  const [allMeasurements, setAllMeasurements] = useState<Measurement[]>([]);
 
   const addFeature = (feature: MapFeature) => {
     setDrawnFeatures((prev) => [...prev, feature]);
@@ -58,12 +69,14 @@ export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setSelectedFeatureId(null);
       setMeasurementResults({ area: null, perimeter: null });
     }
+    deleteMeasurement(id);
   };
   
   const deleteAllFeatures = () => {
     setDrawnFeatures([]);
     setSelectedFeatureId(null);
     setMeasurementResults({ area: null, perimeter: null });
+    setAllMeasurements([]);
     // Force redraw by setting draw mode to null
     setDrawMode(prevMode => {
       if (prevMode !== null) {
@@ -74,6 +87,21 @@ export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
       return prevMode;
     });
+  };
+
+  // Functions for managing measurements
+  const addMeasurement = (id: string, area: number, perimeter: number) => {
+    setAllMeasurements(prev => [...prev, { id, area, perimeter }]);
+  };
+
+  const updateMeasurement = (id: string, area: number, perimeter: number) => {
+    setAllMeasurements(prev => prev.map(m => 
+      m.id === id ? { ...m, area, perimeter } : m
+    ));
+  };
+
+  const deleteMeasurement = (id: string) => {
+    setAllMeasurements(prev => prev.filter(m => m.id !== id));
   };
 
   return (
@@ -95,6 +123,10 @@ export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         setSelectedFeatureId,
         measurementResults,
         setMeasurementResults,
+        allMeasurements,
+        addMeasurement,
+        updateMeasurement,
+        deleteMeasurement,
       }}
     >
       {children}

@@ -185,4 +185,3 @@ export function checkSnapToVertex(
 
   return { snapped: false, position: null, index: -1 };
 }
-

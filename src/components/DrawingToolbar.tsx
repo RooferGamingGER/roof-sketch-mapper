@@ -17,6 +17,7 @@ import {
   TooltipProvider,
   TooltipTrigger 
 } from "@/components/ui/tooltip";
+import MeasurementsSidebar from './MeasurementsSidebar';
 
 const DrawingToolbar: React.FC = () => {
   const { 
@@ -138,10 +139,10 @@ const DrawingToolbar: React.FC = () => {
         </TooltipProvider>
       </div>
 
-      {/* Measurement Results - visible when a polygon is selected or being drawn */}
+      {/* Current Measurement Results - visible when a polygon is selected or being drawn */}
       {(selectedFeatureId || drawMode === 'draw') && measurementResults && (
         <div className="bg-white p-3 rounded-md border border-border shadow-sm">
-          <h3 className="font-medium text-sm mb-2 text-dach-primary">Messungsergebnisse:</h3>
+          <h3 className="font-medium text-sm mb-2 text-dach-primary">Aktuelle Messung:</h3>
           <div className="space-y-1">
             <div className="text-sm flex justify-between items-center">
               <span>Fläche:</span> 
@@ -173,6 +174,11 @@ const DrawingToolbar: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Display all measurements */}
+      {drawnFeatures.length > 0 && (
+        <MeasurementsSidebar />
       )}
     </div>
   );
