@@ -49,7 +49,7 @@ export function getBearing(point1: Position | [number, number], point2: Position
   return turf.bearing(from, to);
 }
 
-// Generate GeoJSON for line segment labels - now always horizontal to camera
+// Generate GeoJSON for line segment labels - updated to work with the map style configuration
 export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = [];
   
@@ -75,11 +75,10 @@ export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCo
     
     const midpoint = getMidpoint(start, end);
     
-    // No rotation for camera-aligned text
     features.push({
       type: 'Feature',
       properties: {
-        length: distance.toFixed(1),
+        length: `${distance.toFixed(1)} m`,
         index: i
       },
       geometry: {

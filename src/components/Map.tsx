@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -197,7 +196,8 @@ const Map: React.FC = () => {
                 minzoom: 15,
                 maxzoom: 22
               }
-            ]
+            ],
+            glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
           },
           zoom: 18,
           pitch: 0,
@@ -321,13 +321,12 @@ const Map: React.FC = () => {
             type: 'symbol',
             source: 'length-labels',
             layout: {
-              'text-field': '{length} m',
+              'text-field': ['get', 'length'],
               'text-size': 12,
               'text-anchor': 'center',
-              'text-rotation-alignment': 'viewport',
               'text-allow-overlap': true,
               'text-letter-spacing': 0.05,
-              'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+              'text-font': ['Open Sans Regular'],
               'text-padding': 3
             },
             paint: {
