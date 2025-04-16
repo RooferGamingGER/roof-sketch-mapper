@@ -45,7 +45,7 @@ export function getBearing(point1: Position | [number, number], point2: Position
 }
 
 // Generate GeoJSON for line segment labels
-export function generateLengthLabels(coordinates: Position[] | [number, number][]): GeoJSON.FeatureCollection {
+export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = [];
   
   if (coordinates.length < 2) return { type: 'FeatureCollection', features };
@@ -93,7 +93,7 @@ export function generateLengthLabels(coordinates: Position[] | [number, number][
 }
 
 // Calculate area and perimeter for a polygon
-export function calculateMeasurements(coordinates: Position[] | [number, number][]): { area: number, perimeter: number } {
+export function calculateMeasurements(coordinates: Position[]): { area: number, perimeter: number } {
   if (coordinates.length < 3) {
     return { area: 0, perimeter: 0 };
   }

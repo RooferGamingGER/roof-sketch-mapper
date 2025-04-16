@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -8,7 +7,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MAPBOX_TOKEN } from '@/config/mapbox';
 import { VertexMarker } from './VertexMarker';
-import { generateLengthLabels, calculateMeasurements } from '@/utils/mapUtils';
+import { generateLengthLabels, calculateMeasurements, positionsToCoordinates } from '@/utils/mapUtils';
+import { Position } from 'geojson';
 
 const Map: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
@@ -45,29 +45,24 @@ const Map: React.FC = () => {
   const [mapError, setMapError] = useState<string | null>(null);
   const [message, setMessage] = useState<string>('Karte wird geladen...');
 
-  // Function to clear all edit markers
   const clearEditMarkers = () => {
     drawRef.current.editMarkers.forEach(marker => marker.remove());
     drawRef.current.editMarkers = [];
   };
 
-  // Function to render length labels for the selected polygon
-  const updateLengthLabels = (coordinates: [number, number][]) => {
+  const updateLengthLabels = (coordinates: Position[]) => {
     if (!map.current || !drawRef.current.lengthLabelsSource) return;
     
     const labels = generateLengthLabels(coordinates);
     drawRef.current.lengthLabelsSource.setData(labels);
   };
 
-  // Function to create edit markers for a polygon
-  const createEditMarkersForPolygon = (coordinates: [number, number][]) => {
+  const createEditMarkersForPolygon = (coordinates: Position[]) => {
     if (!map.current) return;
 
     clearEditMarkers();
 
-    // Create a vertex marker for each coordinate
     coordinates.forEach((coord, index) => {
-      // Skip the last point if it's the same as the first (closing the polygon)
       if (index === coordinates.length - 1 && 
           coordinates[0][0] === coord[0] && 
           coordinates[0][1] === coord[1]) {
@@ -78,27 +73,22 @@ const Map: React.FC = () => {
       
       marker.addTo(map.current!);
       
-      // Handle drag events
       marker.on('dragend', () => {
         if (!selectedFeatureId) return;
         
         const newLngLat = marker.getLngLat();
         const vertexIndex = marker.getVertexIndex();
         
-        // Find the selected feature
         const feature = drawnFeatures.find(f => f.id === selectedFeatureId);
         if (!feature || feature.geometry.type !== 'Polygon') return;
         
-        // Update the coordinate
         const polygonCoords = [...feature.geometry.coordinates[0]];
         polygonCoords[vertexIndex] = [newLngLat.lng, newLngLat.lat];
         
-        // If this is the first point, also update the last point to close the polygon
         if (vertexIndex === 0) {
           polygonCoords[polygonCoords.length - 1] = [newLngLat.lng, newLngLat.lat];
         }
 
-        // Create updated feature
         const updatedFeature = {
           ...feature,
           geometry: {
@@ -107,7 +97,6 @@ const Map: React.FC = () => {
           }
         };
         
-        // Calculate new measurements
         const { area, perimeter } = calculateMeasurements(polygonCoords);
         updatedFeature.properties = {
           ...updatedFeature.properties,
@@ -115,13 +104,10 @@ const Map: React.FC = () => {
           perimeter
         };
         
-        // Update feature
         updateFeature(selectedFeatureId, updatedFeature);
         
-        // Update measurements display
         setMeasurementResults({ area, perimeter });
         
-        // Update length labels
         updateLengthLabels(polygonCoords);
         
         toast.success(`Polygon aktualisiert: ${area.toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
@@ -184,7 +170,6 @@ const Map: React.FC = () => {
             }
           });
           
-          // Add source for length labels
           map.current?.addSource('length-labels', {
             type: 'geojson',
             data: {
@@ -266,7 +251,6 @@ const Map: React.FC = () => {
             }
           });
           
-          // Add layer for length labels
           map.current?.addLayer({
             id: 'length-labels',
             type: 'symbol',
@@ -305,12 +289,10 @@ const Map: React.FC = () => {
                   perimeter
                 });
                 
-                // Show length labels for the selected polygon
                 updateLengthLabels(polygon.coordinates[0]);
                 
                 toast.success(`Fläche: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
                 
-                // If in edit mode, create edit markers
                 if (drawMode === 'edit') {
                   createEditMarkersForPolygon(polygon.coordinates[0]);
                 }
@@ -365,7 +347,6 @@ const Map: React.FC = () => {
     });
   }, [coordinates]);
 
-  // Effect for handling draw mode changes
   useEffect(() => {
     if (!map.current) return;
 
@@ -374,7 +355,6 @@ const Map: React.FC = () => {
     resetCurrentDraw();
     clearEditMarkers();
     
-    // Clear length labels when changing modes
     if (drawRef.current.lengthLabelsSource) {
       drawRef.current.lengthLabelsSource.setData({
         type: 'FeatureCollection',
@@ -392,7 +372,6 @@ const Map: React.FC = () => {
       map.current.getCanvas().style.cursor = 'default';
       setMessage('Klicken Sie auf ein Polygon um es zu bearbeiten. Ziehen Sie die Eckpunkte um das Polygon anzupassen.');
       
-      // If a feature is already selected, enter edit mode for it
       if (selectedFeatureId) {
         const feature = drawnFeatures.find(f => f.id === selectedFeatureId);
         if (feature && feature.geometry.type === 'Polygon') {
@@ -403,7 +382,6 @@ const Map: React.FC = () => {
     } else if (drawMode === 'measure') {
       setMessage('Wählen Sie ein Polygon aus, um dessen Maße anzuzeigen.');
       
-      // If a feature is already selected, show its length labels
       if (selectedFeatureId) {
         const feature = drawnFeatures.find(f => f.id === selectedFeatureId);
         if (feature && feature.geometry.type === 'Polygon') {
@@ -426,7 +404,6 @@ const Map: React.FC = () => {
       });
     }
     
-    // If no feature is selected, clear length labels
     if (!selectedFeatureId && drawRef.current.lengthLabelsSource) {
       drawRef.current.lengthLabelsSource.setData({
         type: 'FeatureCollection',
@@ -511,7 +488,6 @@ const Map: React.FC = () => {
         perimeter
       });
       
-      // Show length labels for the new polygon
       updateLengthLabels(polygonCoords);
       
       toast.success(`Polygon erstellt: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
