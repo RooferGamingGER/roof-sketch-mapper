@@ -10,7 +10,7 @@ const Map: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<{
-    currentPoints: number[][];
+    currentPoints: [number, number][];  // Updated to ensure tuple type
     currentMarkers: mapboxgl.Marker[];
     currentLineSource?: mapboxgl.GeoJSONSource;
     currentPolygonSource?: mapboxgl.GeoJSONSource;
