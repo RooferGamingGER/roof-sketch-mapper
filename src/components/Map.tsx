@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -55,7 +54,6 @@ const Map: React.FC = () => {
   const [message, setMessage] = useState<string>('Karte wird geladen...');
   const [hoverPoint, setHoverPoint] = useState<mapboxgl.Point | null>(null);
   
-  // Define NRW bounding box coordinates
   const nrwBounds = {
     north: 52.5314,
     south: 50.3230,
@@ -63,12 +61,18 @@ const Map: React.FC = () => {
     west: 5.8663
   };
 
+  const isWithinNRW = (lng: number, lat: number): boolean => {
+    return lat >= nrwBounds.south && 
+           lat <= nrwBounds.north && 
+           lng >= nrwBounds.west && 
+           lng <= nrwBounds.east;
+  };
+
   const clearEditMarkers = () => {
     drawRef.current.editMarkers.forEach(marker => marker.remove());
     drawRef.current.editMarkers = [];
   };
 
-  // Function to add an area label marker to the map
   const addAreaLabel = (center: mapboxgl.LngLat, area: number) => {
     if (!map.current) return null;
     
@@ -84,8 +88,7 @@ const Map: React.FC = () => {
     drawRef.current.areaLabels.push(marker);
     return marker;
   };
-  
-  // Helper function to create the DOM element for area labels
+
   const createAreaLabelElement = (areaText: string) => {
     const el = document.createElement('div');
     el.className = 'area-label';
@@ -93,7 +96,6 @@ const Map: React.FC = () => {
     return el;
   };
 
-  // Clean up area labels
   const clearAreaLabels = () => {
     drawRef.current.areaLabels.forEach(marker => marker.remove());
     drawRef.current.areaLabels = [];
@@ -118,7 +120,6 @@ const Map: React.FC = () => {
     });
   };
 
-  // Create area labels for all existing polygons
   const updateAllAreaLabels = () => {
     clearAreaLabels();
     
@@ -228,6 +229,14 @@ const Map: React.FC = () => {
                 ],
                 tileSize: 256,
                 attribution: '© OpenStreetMap contributors'
+              },
+              'mapbox-satellite': {
+                type: 'raster',
+                tiles: [
+                  'https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/{z}/{x}/{y}?access_token=' + MAPBOX_TOKEN
+                ],
+                tileSize: 256,
+                attribution: '© Mapbox © OpenStreetMap © DigitalGlobe'
               }
             },
             layers: [
@@ -239,11 +248,24 @@ const Map: React.FC = () => {
                 maxzoom: 15
               },
               {
-                id: 'satellite-tiles',
+                id: 'nrw-satellite-tiles',
                 type: 'raster',
                 source: 'raster-tiles',
                 minzoom: 15,
-                maxzoom: 22
+                maxzoom: 22,
+                layout: {
+                  visibility: 'visible'
+                }
+              },
+              {
+                id: 'mapbox-satellite-tiles',
+                type: 'raster',
+                source: 'mapbox-satellite',
+                minzoom: 15,
+                maxzoom: 22,
+                layout: {
+                  visibility: 'none'
+                }
               }
             ],
             glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf"
@@ -253,7 +275,7 @@ const Map: React.FC = () => {
           bearing: 0,
           attributionControl: false,
           center: [7.4652, 51.5135], // Center of NRW
-          maxBounds: [[nrwBounds.west, nrwBounds.south], [nrwBounds.east, nrwBounds.north]]
+          maxBounds: null
         });
 
         map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -428,7 +450,6 @@ const Map: React.FC = () => {
                 map.current.getCanvas().style.cursor = 'crosshair';
               }
               
-              // Update the current line source for visual feedback during drawing
               if (drawRef.current.currentLineSource && drawRef.current.currentPoints.length > 0) {
                 const movePoint = [e.lngLat.lng, e.lngLat.lat];
                 const tempPoints = [...drawRef.current.currentPoints, movePoint];
@@ -453,28 +474,36 @@ const Map: React.FC = () => {
           setMessage('Karte geladen. Sie können nun mit dem Zeichnen beginnen.');
           clearTimeout(loadTimeout);
           
-          // Add warning for non-NRW areas
-          map.current.on('moveend', () => {
-            const center = map.current?.getCenter();
-            const zoom = map.current?.getZoom() || 0;
+          const updateLayerVisibility = () => {
+            if (!map.current) return;
             
-            if (center && (
-              center.lat < nrwBounds.south || 
-              center.lat > nrwBounds.north || 
-              center.lng < nrwBounds.west || 
-              center.lng > nrwBounds.east
-            )) {
-              toast.warning('Sie haben den Bereich von Nordrhein-Westfalen verlassen. Satellitenbilder sind nur für NRW verfügbar.');
-            }
+            const center = map.current.getCenter();
+            const zoom = map.current.getZoom();
+            const isInNRW = isWithinNRW(center.lng, center.lat);
             
-            if (zoom < 15) {
-              setMessage('Bitte zoomen Sie näher heran, um die Satellitenbilder zu sehen.');
+            if (zoom >= 15) {
+              if (isInNRW) {
+                map.current.setLayoutProperty('nrw-satellite-tiles', 'visibility', 'visible');
+                map.current.setLayoutProperty('mapbox-satellite-tiles', 'visibility', 'none');
+                setMessage('');
+              } else {
+                map.current.setLayoutProperty('nrw-satellite-tiles', 'visibility', 'none');
+                map.current.setLayoutProperty('mapbox-satellite-tiles', 'visibility', 'visible');
+                toast.warning('Sie befinden sich außerhalb von Nordrhein-Westfalen. Es werden Mapbox-Satellitenbilder angezeigt.');
+                setMessage('Sie befinden sich außerhalb von NRW. Mapbox-Satellitenbilder werden angezeigt.');
+              }
             } else {
-              setMessage('');
+              map.current.setLayoutProperty('nrw-satellite-tiles', 'visibility', 'none');
+              map.current.setLayoutProperty('mapbox-satellite-tiles', 'visibility', 'none');
+              setMessage('Bitte zoomen Sie näher heran, um die Satellitenbilder zu sehen.');
             }
             
             updateMeasurements();
-          });
+          };
+          
+          map.current.on('moveend', updateLayerVisibility);
+          
+          updateLayerVisibility();
         });
 
         map.current.on('error', (e) => {
@@ -635,7 +664,6 @@ const Map: React.FC = () => {
       perimeter
     });
     
-    // Add area label for the new polygon
     const polygonCenter = turf.center(polygonFeature).geometry.coordinates;
     addAreaLabel(new mapboxgl.LngLat(polygonCenter[0], polygonCenter[1]), area);
     
@@ -647,7 +675,6 @@ const Map: React.FC = () => {
     return true;
   };
   
-  // Handle right-click to finish drawing a polygon
   const handleRightClick = (e: mapboxgl.MapMouseEvent) => {
     if (!map.current || drawMode !== 'draw' || drawRef.current.currentPoints.length < 3) {
       return;
@@ -701,7 +728,6 @@ const Map: React.FC = () => {
         }
       });
       
-      // Update length labels during drawing
       if (drawRef.current.lengthLabelsSource) {
         const closedPolygon = [...tempPolygonCoords, tempPolygonCoords[0]];
         const labels = generateLengthLabels(closedPolygon);
@@ -710,7 +736,6 @@ const Map: React.FC = () => {
       }
     }
 
-    // Show measurements during drawing
     if (drawRef.current.currentPoints.length >= 3) {
       const tempPolygonCoords = [...drawRef.current.currentPoints];
       const { area, perimeter } = calculateMeasurements([...tempPolygonCoords, tempPolygonCoords[0]]);
@@ -771,7 +796,7 @@ const Map: React.FC = () => {
       <div ref={mapContainer} className="w-full h-full min-h-[400px]" />
       
       <div className="absolute bottom-0 right-0 z-10 text-xs text-white bg-black/50 px-2 py-1">
-        © Geobasis NRW 2023
+        © Geobasis NRW 2023 | © Mapbox
       </div>
     </div>
   );
