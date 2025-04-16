@@ -1,10 +1,11 @@
 
 import mapboxgl from 'mapbox-gl';
+import { Position } from 'geojson';
 
 export class VertexMarker extends mapboxgl.Marker {
   private vertexIndex: number;
   
-  constructor(lngLat: mapboxgl.LngLatLike, vertexIndex: number) {
+  constructor(lngLat: mapboxgl.LngLatLike | Position, vertexIndex: number) {
     // Create a custom element for our vertex marker
     const el = document.createElement('div');
     el.className = 'vertex-marker';
@@ -23,7 +24,13 @@ export class VertexMarker extends mapboxgl.Marker {
       anchor: 'center'
     });
     
-    this.setLngLat(lngLat);
+    // Handle Position type (GeoJSON) or LngLatLike
+    if (Array.isArray(lngLat)) {
+      this.setLngLat([lngLat[0], lngLat[1]]);
+    } else {
+      this.setLngLat(lngLat);
+    }
+    
     this.vertexIndex = vertexIndex;
   }
   
