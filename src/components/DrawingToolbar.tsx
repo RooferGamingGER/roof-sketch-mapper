@@ -6,6 +6,7 @@ import {
   Edit,
   Trash2,
   X,
+  Trash
 } from 'lucide-react';
 import { useMapContext, DrawMode } from '@/context/MapContext';
 import { toast } from 'sonner';
@@ -142,22 +143,34 @@ const DrawingToolbar: React.FC = () => {
         <div className="bg-white p-3 rounded-md border border-border shadow-sm">
           <h3 className="font-medium text-sm mb-2 text-dach-primary">Messungsergebnisse:</h3>
           <div className="space-y-1">
-            <p className="text-sm flex justify-between">
+            <div className="text-sm flex justify-between items-center">
               <span>Fläche:</span> 
-              <span className="font-medium">
-                {measurementResults.area 
-                  ? `${(measurementResults.area).toFixed(2)} m²` 
-                  : '-'}
-              </span>
-            </p>
-            <p className="text-sm flex justify-between">
+              <div className="flex items-center">
+                <span className="font-medium mr-2">
+                  {measurementResults.area 
+                    ? `${(measurementResults.area).toFixed(2)} m²` 
+                    : '-'}
+                </span>
+                {selectedFeatureId && (
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6 hover:bg-red-100 hover:text-red-500"
+                    onClick={() => deleteFeature(selectedFeatureId)}
+                  >
+                    <Trash className="h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
+            </div>
+            <div className="text-sm flex justify-between items-center">
               <span>Umfang:</span> 
               <span className="font-medium">
                 {measurementResults.perimeter 
                   ? `${measurementResults.perimeter.toFixed(2)} m` 
                   : '-'}
               </span>
-            </p>
+            </div>
           </div>
         </div>
       )}

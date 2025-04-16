@@ -427,6 +427,21 @@ const Map: React.FC = () => {
               } else {
                 map.current.getCanvas().style.cursor = 'crosshair';
               }
+              
+              // Update the current line source for visual feedback during drawing
+              if (drawRef.current.currentLineSource && drawRef.current.currentPoints.length > 0) {
+                const movePoint = [e.lngLat.lng, e.lngLat.lat];
+                const tempPoints = [...drawRef.current.currentPoints, movePoint];
+                
+                drawRef.current.currentLineSource.setData({
+                  type: 'Feature',
+                  properties: {},
+                  geometry: {
+                    type: 'LineString',
+                    coordinates: positionsToCoordinates(tempPoints)
+                  }
+                });
+              }
             }
           });
 
@@ -501,6 +516,7 @@ const Map: React.FC = () => {
     if (!map.current) return;
 
     map.current.off('click', handleMapClick);
+    map.current.off('contextmenu', handleRightClick);
 
     resetCurrentDraw();
     clearEditMarkers();
@@ -513,8 +529,9 @@ const Map: React.FC = () => {
 
     if (drawMode === 'draw') {
       map.current.on('click', handleMapClick);
+      map.current.on('contextmenu', handleRightClick);
       map.current.getCanvas().style.cursor = 'crosshair';
-      setMessage('Klicken Sie auf die Karte, um Punkte hinzuzufügen. Schließen Sie das Polygon durch Klicken auf den ersten Punkt.');
+      setMessage('Klicken Sie auf die Karte, um Punkte hinzuzufügen. Rechtsklick oder Klicken auf den ersten Punkt zum Abschließen.');
     } else if (drawMode === 'edit') {
       map.current.getCanvas().style.cursor = 'default';
       setMessage('Klicken Sie auf ein Polygon um es zu bearbeiten. Ziehen Sie die Eckpunkte um das Polygon anzupassen.');
@@ -591,6 +608,55 @@ const Map: React.FC = () => {
     return null;
   };
 
+  const completePolygon = () => {
+    if (drawRef.current.currentPoints.length < 3) {
+      toast.error('Ein Polygon benötigt mindestens 3 Punkte');
+      return false;
+    }
+
+    const firstPoint = drawRef.current.currentPoints[0];
+    const polygonCoords = [...drawRef.current.currentPoints, firstPoint];
+    const polygonFeature = turf.polygon([positionsToCoordinates(polygonCoords)]);
+    polygonFeature.id = `polygon-${Date.now()}`;
+    
+    const { area, perimeter } = calculateMeasurements(polygonCoords);
+    
+    polygonFeature.properties = {
+      id: polygonFeature.id,
+      area,
+      perimeter
+    };
+    
+    addFeature(polygonFeature);
+    setSelectedFeatureId(polygonFeature.id as string);
+    
+    setMeasurementResults({
+      area,
+      perimeter
+    });
+    
+    // Add area label for the new polygon
+    const polygonCenter = turf.center(polygonFeature).geometry.coordinates;
+    addAreaLabel(new mapboxgl.LngLat(polygonCenter[0], polygonCenter[1]), area);
+    
+    updateAllPolygonLabels();
+    
+    toast.success(`Polygon erstellt: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
+    
+    resetCurrentDraw();
+    return true;
+  };
+  
+  // Handle right-click to finish drawing a polygon
+  const handleRightClick = (e: mapboxgl.MapMouseEvent) => {
+    if (!map.current || drawMode !== 'draw' || drawRef.current.currentPoints.length < 3) {
+      return;
+    }
+    
+    e.preventDefault();
+    completePolygon();
+  };
+
   const handleMapClick = (e: mapboxgl.MapMouseEvent) => {
     if (!map.current || drawMode !== 'draw') return;
 
@@ -600,36 +666,7 @@ const Map: React.FC = () => {
     const snapPoint = checkSnapToFirst(point);
     if (snapPoint) {
       coords = snapPoint;
-      
-      const polygonCoords = [...drawRef.current.currentPoints, snapPoint];
-      const polygonFeature = turf.polygon([positionsToCoordinates(polygonCoords)]);
-      polygonFeature.id = `polygon-${Date.now()}`;
-      
-      const { area, perimeter } = calculateMeasurements(polygonCoords);
-      
-      polygonFeature.properties = {
-        id: polygonFeature.id,
-        area,
-        perimeter
-      };
-      
-      addFeature(polygonFeature);
-      setSelectedFeatureId(polygonFeature.id as string);
-      
-      setMeasurementResults({
-        area,
-        perimeter
-      });
-      
-      // Add area label for the new polygon
-      const polygonCenter = turf.center(polygonFeature).geometry.coordinates;
-      addAreaLabel(new mapboxgl.LngLat(polygonCenter[0], polygonCenter[1]), area);
-      
-      updateAllPolygonLabels();
-      
-      toast.success(`Polygon erstellt: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
-      
-      resetCurrentDraw();
+      completePolygon();
       return;
     } else {
       coords = [e.lngLat.lng, e.lngLat.lat];
@@ -663,6 +700,14 @@ const Map: React.FC = () => {
           coordinates: [positionsToCoordinates([...tempPolygonCoords, tempPolygonCoords[0]])]
         }
       });
+      
+      // Update length labels during drawing
+      if (drawRef.current.lengthLabelsSource) {
+        const closedPolygon = [...tempPolygonCoords, tempPolygonCoords[0]];
+        const labels = generateLengthLabels(closedPolygon);
+        
+        drawRef.current.lengthLabelsSource.setData(labels);
+      }
     }
 
     // Show measurements during drawing
