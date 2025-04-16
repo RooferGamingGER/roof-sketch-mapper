@@ -5,7 +5,7 @@ import {
   Pencil,
   Square,
   Trash2,
-  RulerSquare,
+  Ruler,
   X,
   Save
 } from 'lucide-react';
@@ -81,7 +81,7 @@ const DrawingToolbar: React.FC = () => {
                   drawMode === 'measure' && 'bg-dach-primary hover:bg-dach-primary/90 text-white'
                 )}
               >
-                <RulerSquare className="h-5 w-5" />
+                <Ruler className="h-5 w-5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
