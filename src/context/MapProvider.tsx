@@ -10,7 +10,6 @@ interface MapProviderProps {
 export const MapProvider = ({ children }: MapProviderProps) => {
   return (
     <OriginalMapProvider>
-      <RoofMapperExtension />
       {children}
     </OriginalMapProvider>
   );

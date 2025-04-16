@@ -8,12 +8,23 @@ export const useMeasurementSync = () => {
     drawnFeatures, 
     addMeasurement, 
     updateMeasurement, 
-    allMeasurements 
+    allMeasurements,
+    deleteMeasurement
   } = useMapContext();
 
   // Sync measurements with drawn features
   useEffect(() => {
     const syncMeasurements = () => {
+      // Create a set of current feature IDs for faster lookup
+      const currentFeatureIds = new Set(drawnFeatures.map(f => f.id as string));
+      
+      // Remove measurements that no longer have a corresponding feature
+      allMeasurements.forEach(measurement => {
+        if (!currentFeatureIds.has(measurement.id)) {
+          deleteMeasurement(measurement.id);
+        }
+      });
+      
       // Process each feature and update/add measurements
       drawnFeatures.forEach(feature => {
         const id = feature.id as string;
@@ -44,7 +55,7 @@ export const useMeasurementSync = () => {
     };
     
     syncMeasurements();
-  }, [drawnFeatures, addMeasurement, updateMeasurement, allMeasurements]);
+  }, [drawnFeatures, addMeasurement, updateMeasurement, deleteMeasurement, allMeasurements]);
   
   return null;
 };
