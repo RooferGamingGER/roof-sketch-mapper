@@ -1,6 +1,7 @@
 
 import mapboxgl from 'mapbox-gl';
 import { Position } from 'geojson';
+import { positionToLngLat } from '../utils/mapUtils';
 
 export class VertexMarker extends mapboxgl.Marker {
   private vertexIndex: number;
@@ -26,7 +27,8 @@ export class VertexMarker extends mapboxgl.Marker {
     
     // Handle Position type (GeoJSON) or LngLatLike
     if (Array.isArray(lngLat)) {
-      this.setLngLat([lngLat[0], lngLat[1]]);
+      // Sicherstellen, dass wir eine gültige LngLatLike erzeugen
+      this.setLngLat(positionToLngLat(lngLat));
     } else {
       this.setLngLat(lngLat);
     }

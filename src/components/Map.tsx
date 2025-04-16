@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -12,7 +11,8 @@ import {
   generateLengthLabels, 
   calculateMeasurements, 
   positionsToCoordinates,
-  checkSnapToVertex
+  checkSnapToVertex,
+  positionToLngLat
 } from '@/utils/mapUtils';
 import { Position } from 'geojson';
 
@@ -33,7 +33,7 @@ const Map: React.FC = () => {
     currentMarkers: [],
     editMarkers: [],
     snap: true,
-    snapDistance: 15  // Erhöhter Wert für besseren Punktfang
+    snapDistance: 15
   });
 
   const {
@@ -57,11 +57,9 @@ const Map: React.FC = () => {
     drawRef.current.editMarkers = [];
   };
 
-  // Immer die Maßangaben für alle Polygone anzeigen
   const updateAllPolygonLabels = () => {
     if (!map.current || !drawRef.current.lengthLabelsSource) return;
     
-    // Feature-Collection für alle Label erstellen
     const allLabelFeatures: GeoJSON.Feature[] = [];
     
     drawnFeatures.forEach(feature => {
@@ -72,7 +70,6 @@ const Map: React.FC = () => {
       }
     });
     
-    // Alle Labels auf einmal setzen
     drawRef.current.lengthLabelsSource.setData({
       type: 'FeatureCollection',
       features: allLabelFeatures
@@ -130,7 +127,6 @@ const Map: React.FC = () => {
         
         setMeasurementResults({ area, perimeter });
         
-        // Alle Labels aktualisieren
         updateAllPolygonLabels();
         
         toast.success(`Polygon aktualisiert: ${area.toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
@@ -282,7 +278,7 @@ const Map: React.FC = () => {
               'text-field': '{length} m',
               'text-size': 12,
               'text-anchor': 'center',
-              'text-rotation-alignment': 'viewport', // Immer zur Kamera ausgerichtet
+              'text-rotation-alignment': 'viewport',
               'text-allow-overlap': true,
               'text-letter-spacing': 0.05,
               'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
@@ -320,12 +316,10 @@ const Map: React.FC = () => {
             }
           });
 
-          // Mausbewegungen für Punktfang verfolgen
           map.current.on('mousemove', (e) => {
             setHoverPoint(e.point);
             
             if (drawMode === 'draw' && drawRef.current.currentPoints.length > 0) {
-              // Nur UI-Feedback anzeigen, keine tatsächliche Operation
               const snapResult = checkSnapToVertex(
                 e.point, 
                 map.current!, 
@@ -397,7 +391,6 @@ const Map: React.FC = () => {
     resetCurrentDraw();
     clearEditMarkers();
     
-    // Alle Labels für alle Polygone immer anzeigen
     updateAllPolygonLabels();
 
     map.current.getCanvas().style.cursor = '';
@@ -423,7 +416,6 @@ const Map: React.FC = () => {
     }
   }, [drawMode, selectedFeatureId, drawnFeatures]);
 
-  // Labels immer neu laden, wenn sich die Features ändern
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded()) return;
 
@@ -435,7 +427,6 @@ const Map: React.FC = () => {
       });
     }
     
-    // Labels für alle Polygone aktualisieren
     updateAllPolygonLabels();
   }, [drawnFeatures, selectedFeatureId]);
 
@@ -491,7 +482,6 @@ const Map: React.FC = () => {
     const point = e.point;
     let coords: Position;
     
-    // Prüfen, ob zum ersten Punkt geschnappt werden soll (Polygon schließen)
     const snapPoint = checkSnapToFirst(point);
     if (snapPoint) {
       coords = snapPoint;
@@ -516,7 +506,6 @@ const Map: React.FC = () => {
         perimeter
       });
       
-      // Labels für alle Polygone aktualisieren
       updateAllPolygonLabels();
       
       toast.success(`Polygon erstellt: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
@@ -530,7 +519,7 @@ const Map: React.FC = () => {
     drawRef.current.currentPoints.push(coords);
 
     const marker = new mapboxgl.Marker({ color: '#e67e22', scale: 0.7 })
-      .setLngLat(coords)
+      .setLngLat(positionToLngLat(coords))
       .addTo(map.current);
     drawRef.current.currentMarkers.push(marker);
 
@@ -559,7 +548,6 @@ const Map: React.FC = () => {
   };
 
   const updateMeasurements = () => {
-    // Label-Aktualisierung bei Kartenbewegung
     if (drawnFeatures.length > 0) {
       updateAllPolygonLabels();
     }

@@ -8,6 +8,11 @@ export function positionToCoordinate(position: Position): [number, number] {
   return [position[0], position[1]];
 }
 
+// Convert position to LngLatLike for mapbox
+export function positionToLngLat(position: Position): mapboxgl.LngLatLike {
+  return [position[0], position[1]];
+}
+
 // Convert array of GeoJSON Positions to array of [number, number] tuples
 export function positionsToCoordinates(positions: Position[]): [number, number][] {
   return positions.map(pos => positionToCoordinate(pos));
@@ -109,7 +114,7 @@ export function calculateMeasurements(coordinates: Position[]): { area: number, 
   return { area, perimeter };
 }
 
-// Neue Funktion zum Prüfen des Punktfangs bei Polygonen
+// Funktion zum Prüfen des Punktfangs bei Polygonen
 export function checkSnapToVertex(
   point: mapboxgl.Point, 
   mapInstance: mapboxgl.Map,
