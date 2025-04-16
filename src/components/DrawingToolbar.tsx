@@ -3,7 +3,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { 
   Pencil,
-  Square,
+  Edit,
   Trash2,
   Ruler,
   X,
@@ -67,6 +67,26 @@ const DrawingToolbar: React.FC = () => {
             </TooltipTrigger>
             <TooltipContent>
               <p>Polygon zeichnen</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Bearbeiten-Button */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant={drawMode === 'edit' ? 'default' : 'outline'}
+                size="icon"
+                onClick={() => setMode('edit')}
+                disabled={!selectedFeatureId}
+                className={cn(
+                  drawMode === 'edit' && 'bg-amber-500 hover:bg-amber-500/90 text-white'
+                )}
+              >
+                <Edit className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Polygon bearbeiten</p>
             </TooltipContent>
           </Tooltip>
 

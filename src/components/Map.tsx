@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -6,6 +7,8 @@ import { useMapContext } from '@/context/MapContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MAPBOX_TOKEN } from '@/config/mapbox';
+import { VertexMarker } from './VertexMarker';
+import { generateLengthLabels, calculateMeasurements } from '@/utils/mapUtils';
 
 const Map: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
@@ -13,13 +16,16 @@ const Map: React.FC = () => {
   const drawRef = useRef<{
     currentPoints: [number, number][];
     currentMarkers: mapboxgl.Marker[];
+    editMarkers: VertexMarker[];
     currentLineSource?: mapboxgl.GeoJSONSource;
     currentPolygonSource?: mapboxgl.GeoJSONSource;
+    lengthLabelsSource?: mapboxgl.GeoJSONSource;
     snap: boolean;
     snapDistance: number;
   }>({
     currentPoints: [],
     currentMarkers: [],
+    editMarkers: [],
     snap: true,
     snapDistance: 10
   });
@@ -29,6 +35,7 @@ const Map: React.FC = () => {
     drawMode,
     addFeature,
     drawnFeatures,
+    updateFeature,
     selectedFeatureId,
     setSelectedFeatureId,
     setMeasurementResults
@@ -37,6 +44,92 @@ const Map: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
   const [message, setMessage] = useState<string>('Karte wird geladen...');
+
+  // Function to clear all edit markers
+  const clearEditMarkers = () => {
+    drawRef.current.editMarkers.forEach(marker => marker.remove());
+    drawRef.current.editMarkers = [];
+  };
+
+  // Function to render length labels for the selected polygon
+  const updateLengthLabels = (coordinates: [number, number][]) => {
+    if (!map.current || !drawRef.current.lengthLabelsSource) return;
+    
+    const labels = generateLengthLabels(coordinates);
+    drawRef.current.lengthLabelsSource.setData(labels);
+  };
+
+  // Function to create edit markers for a polygon
+  const createEditMarkersForPolygon = (coordinates: [number, number][]) => {
+    if (!map.current) return;
+
+    clearEditMarkers();
+
+    // Create a vertex marker for each coordinate
+    coordinates.forEach((coord, index) => {
+      // Skip the last point if it's the same as the first (closing the polygon)
+      if (index === coordinates.length - 1 && 
+          coordinates[0][0] === coord[0] && 
+          coordinates[0][1] === coord[1]) {
+        return;
+      }
+
+      const marker = new VertexMarker(coord, index);
+      
+      marker.addTo(map.current!);
+      
+      // Handle drag events
+      marker.on('dragend', () => {
+        if (!selectedFeatureId) return;
+        
+        const newLngLat = marker.getLngLat();
+        const vertexIndex = marker.getVertexIndex();
+        
+        // Find the selected feature
+        const feature = drawnFeatures.find(f => f.id === selectedFeatureId);
+        if (!feature || feature.geometry.type !== 'Polygon') return;
+        
+        // Update the coordinate
+        const polygonCoords = [...feature.geometry.coordinates[0]];
+        polygonCoords[vertexIndex] = [newLngLat.lng, newLngLat.lat];
+        
+        // If this is the first point, also update the last point to close the polygon
+        if (vertexIndex === 0) {
+          polygonCoords[polygonCoords.length - 1] = [newLngLat.lng, newLngLat.lat];
+        }
+
+        // Create updated feature
+        const updatedFeature = {
+          ...feature,
+          geometry: {
+            ...feature.geometry,
+            coordinates: [polygonCoords]
+          }
+        };
+        
+        // Calculate new measurements
+        const { area, perimeter } = calculateMeasurements(polygonCoords);
+        updatedFeature.properties = {
+          ...updatedFeature.properties,
+          area,
+          perimeter
+        };
+        
+        // Update feature
+        updateFeature(selectedFeatureId, updatedFeature);
+        
+        // Update measurements display
+        setMeasurementResults({ area, perimeter });
+        
+        // Update length labels
+        updateLengthLabels(polygonCoords);
+        
+        toast.success(`Polygon aktualisiert: ${area.toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
+      });
+      
+      drawRef.current.editMarkers.push(marker);
+    });
+  };
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -88,6 +181,15 @@ const Map: React.FC = () => {
                 type: 'Polygon',
                 coordinates: [[]]
               }
+            }
+          });
+          
+          // Add source for length labels
+          map.current?.addSource('length-labels', {
+            type: 'geojson',
+            data: {
+              type: 'FeatureCollection',
+              features: []
             }
           });
 
@@ -163,6 +265,29 @@ const Map: React.FC = () => {
               'line-width': 2
             }
           });
+          
+          // Add layer for length labels
+          map.current?.addLayer({
+            id: 'length-labels',
+            type: 'symbol',
+            source: 'length-labels',
+            layout: {
+              'text-field': '{length} m',
+              'text-size': 12,
+              'text-anchor': 'center',
+              'text-rotation-alignment': 'map',
+              'text-rotate': ['get', 'bearing'],
+              'text-allow-overlap': true,
+              'text-letter-spacing': 0.05,
+              'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
+              'text-padding': 3
+            },
+            paint: {
+              'text-color': '#ffffff',
+              'text-halo-color': '#3498db',
+              'text-halo-width': 1.5
+            }
+          });
 
           map.current?.on('click', 'saved-polygons-layer', (e) => {
             if (e.features && e.features.length > 0) {
@@ -171,23 +296,31 @@ const Map: React.FC = () => {
               
               const feature = drawnFeatures.find(f => f.id === featureId);
               if (feature && feature.geometry.type === 'Polygon') {
-                const area = turf.area(feature);
+                const area = feature.properties?.area || turf.area(feature);
                 const polygon = feature.geometry as GeoJSON.Polygon;
-                const line = turf.lineString(polygon.coordinates[0]);
-                const perimeter = turf.length(line, { units: 'meters' });
+                const perimeter = feature.properties?.perimeter || turf.length(turf.lineString(polygon.coordinates[0]), { units: 'meters' });
                 
                 setMeasurementResults({
                   area,
                   perimeter
                 });
                 
+                // Show length labels for the selected polygon
+                updateLengthLabels(polygon.coordinates[0]);
+                
                 toast.success(`Fläche: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
+                
+                // If in edit mode, create edit markers
+                if (drawMode === 'edit') {
+                  createEditMarkersForPolygon(polygon.coordinates[0]);
+                }
               }
             }
           });
 
           drawRef.current.currentLineSource = map.current?.getSource('current-line') as mapboxgl.GeoJSONSource;
           drawRef.current.currentPolygonSource = map.current?.getSource('current-polygon') as mapboxgl.GeoJSONSource;
+          drawRef.current.lengthLabelsSource = map.current?.getSource('length-labels') as mapboxgl.GeoJSONSource;
 
           setIsLoading(false);
           setMessage('Karte geladen. Sie können nun mit dem Zeichnen beginnen.');
@@ -218,6 +351,7 @@ const Map: React.FC = () => {
         drawRef.current.currentMarkers.forEach(marker => marker.remove());
         drawRef.current.currentMarkers = [];
       }
+      clearEditMarkers();
     };
   }, []);
 
@@ -230,6 +364,76 @@ const Map: React.FC = () => {
       essential: true
     });
   }, [coordinates]);
+
+  // Effect for handling draw mode changes
+  useEffect(() => {
+    if (!map.current) return;
+
+    map.current.off('click', handleMapClick);
+
+    resetCurrentDraw();
+    clearEditMarkers();
+    
+    // Clear length labels when changing modes
+    if (drawRef.current.lengthLabelsSource) {
+      drawRef.current.lengthLabelsSource.setData({
+        type: 'FeatureCollection',
+        features: []
+      });
+    }
+
+    map.current.getCanvas().style.cursor = '';
+
+    if (drawMode === 'draw') {
+      map.current.on('click', handleMapClick);
+      map.current.getCanvas().style.cursor = 'crosshair';
+      setMessage('Klicken Sie auf die Karte, um Punkte hinzuzufügen. Schließen Sie das Polygon durch Klicken auf den ersten Punkt.');
+    } else if (drawMode === 'edit') {
+      map.current.getCanvas().style.cursor = 'default';
+      setMessage('Klicken Sie auf ein Polygon um es zu bearbeiten. Ziehen Sie die Eckpunkte um das Polygon anzupassen.');
+      
+      // If a feature is already selected, enter edit mode for it
+      if (selectedFeatureId) {
+        const feature = drawnFeatures.find(f => f.id === selectedFeatureId);
+        if (feature && feature.geometry.type === 'Polygon') {
+          createEditMarkersForPolygon(feature.geometry.coordinates[0]);
+          updateLengthLabels(feature.geometry.coordinates[0]);
+        }
+      }
+    } else if (drawMode === 'measure') {
+      setMessage('Wählen Sie ein Polygon aus, um dessen Maße anzuzeigen.');
+      
+      // If a feature is already selected, show its length labels
+      if (selectedFeatureId) {
+        const feature = drawnFeatures.find(f => f.id === selectedFeatureId);
+        if (feature && feature.geometry.type === 'Polygon') {
+          updateLengthLabels(feature.geometry.coordinates[0]);
+        }
+      }
+    } else {
+      setMessage('');
+    }
+  }, [drawMode, selectedFeatureId, drawnFeatures]);
+
+  useEffect(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    const source = map.current.getSource('saved-polygons') as mapboxgl.GeoJSONSource;
+    if (source) {
+      source.setData({
+        type: 'FeatureCollection',
+        features: drawnFeatures
+      });
+    }
+    
+    // If no feature is selected, clear length labels
+    if (!selectedFeatureId && drawRef.current.lengthLabelsSource) {
+      drawRef.current.lengthLabelsSource.setData({
+        type: 'FeatureCollection',
+        features: []
+      });
+    }
+  }, [drawnFeatures, selectedFeatureId]);
 
   const resetCurrentDraw = () => {
     drawRef.current.currentPoints = [];
@@ -277,37 +481,6 @@ const Map: React.FC = () => {
     return null;
   };
 
-  useEffect(() => {
-    if (!map.current) return;
-
-    map.current.off('click', handleMapClick);
-
-    resetCurrentDraw();
-
-    map.current.getCanvas().style.cursor = '';
-
-    if (drawMode === 'draw') {
-      map.current.on('click', handleMapClick);
-      map.current.getCanvas().style.cursor = 'crosshair';
-      setMessage('Klicken Sie auf die Karte, um Punkte hinzuzufügen. Schließen Sie das Polygon durch Klicken auf den ersten Punkt.');
-    } else if (drawMode === 'measure') {
-      updateMeasurements();
-      setMessage('Wählen Sie ein Polygon aus, um dessen Maße anzuzeigen.');
-    }
-  }, [drawMode]);
-
-  useEffect(() => {
-    if (!map.current || !map.current.isStyleLoaded()) return;
-
-    const source = map.current.getSource('saved-polygons') as mapboxgl.GeoJSONSource;
-    if (source) {
-      source.setData({
-        type: 'FeatureCollection',
-        features: drawnFeatures
-      });
-    }
-  }, [drawnFeatures, selectedFeatureId]);
-
   const handleMapClick = (e: mapboxgl.MapMouseEvent) => {
     if (!map.current || drawMode !== 'draw') return;
 
@@ -322,9 +495,7 @@ const Map: React.FC = () => {
       const polygonFeature = turf.polygon([[...polygonCoords, polygonCoords[0]]]);
       polygonFeature.id = `polygon-${Date.now()}`;
       
-      const area = turf.area(polygonFeature);
-      const line = turf.lineString([...polygonCoords, polygonCoords[0]]);
-      const perimeter = turf.length(line, { units: 'meters' });
+      const { area, perimeter } = calculateMeasurements(polygonCoords);
       
       polygonFeature.properties = {
         id: polygonFeature.id,
@@ -333,11 +504,15 @@ const Map: React.FC = () => {
       };
       
       addFeature(polygonFeature);
+      setSelectedFeatureId(polygonFeature.id as string);
       
       setMeasurementResults({
         area,
         perimeter
       });
+      
+      // Show length labels for the new polygon
+      updateLengthLabels(polygonCoords);
       
       toast.success(`Polygon erstellt: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
       
@@ -379,6 +554,7 @@ const Map: React.FC = () => {
   };
 
   const updateMeasurements = () => {
+    // This function can be used for any measurement updates needed during map movements
   };
 
   return (
@@ -411,6 +587,12 @@ const Map: React.FC = () => {
           <div className="text-center max-w-md">
             <p className="text-dach-primary font-medium">Bitte suchen Sie eine Adresse, um mit der Kartendarstellung zu beginnen.</p>
           </div>
+        </div>
+      )}
+
+      {message && !isLoading && !mapError && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 px-4 py-2 bg-white/90 rounded-md shadow-md text-sm font-medium text-gray-800 pointer-events-none">
+          {message}
         </div>
       )}
 
