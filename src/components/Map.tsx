@@ -78,6 +78,20 @@ const Map: React.FC = () => {
     }
   };
 
+  // Define wrapper functions at component level so they can be referenced 
+  // before being used in the useEffect
+  const handleMapClickWrapper = (e: mapboxgl.MapMouseEvent) => {
+    if (map.current) {
+      handleMapClick(e, map.current, drawMode, updateAllPolygonLabels, updateMeasurements);
+    }
+  };
+
+  const handleRightClickWrapper = (e: mapboxgl.MapMouseEvent) => {
+    if (map.current) {
+      handleRightClick(e, map.current, drawMode);
+    }
+  };
+
   // Initialize map
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -208,20 +222,6 @@ const Map: React.FC = () => {
     updateAllAreaLabels();
 
     map.current.getCanvas().style.cursor = '';
-
-    // Define wrapper functions outside the conditional blocks
-    // This ensures they're created only once per effect run
-    const handleMapClickWrapper = (e: mapboxgl.MapMouseEvent) => {
-      if (map.current) {
-        handleMapClick(e, map.current, drawMode, updateAllPolygonLabels, updateMeasurements);
-      }
-    };
-
-    const handleRightClickWrapper = (e: mapboxgl.MapMouseEvent) => {
-      if (map.current) {
-        handleRightClick(e, map.current, drawMode);
-      }
-    };
 
     if (drawMode === 'draw') {
       // Add event listeners with the wrapper functions
