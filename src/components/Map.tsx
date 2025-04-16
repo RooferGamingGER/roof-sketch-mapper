@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -26,12 +27,14 @@ const Map: React.FC = () => {
     currentLineSource?: mapboxgl.GeoJSONSource;
     currentPolygonSource?: mapboxgl.GeoJSONSource;
     lengthLabelsSource?: mapboxgl.GeoJSONSource;
+    areaLabels: mapboxgl.Marker[];
     snap: boolean;
     snapDistance: number;
   }>({
     currentPoints: [],
     currentMarkers: [],
     editMarkers: [],
+    areaLabels: [],
     snap: true,
     snapDistance: 15
   });
@@ -65,6 +68,37 @@ const Map: React.FC = () => {
     drawRef.current.editMarkers = [];
   };
 
+  // Function to add an area label marker to the map
+  const addAreaLabel = (center: mapboxgl.LngLat, area: number) => {
+    if (!map.current) return null;
+    
+    const formattedArea = (area).toFixed(2);
+    
+    const marker = new mapboxgl.Marker({
+      element: createAreaLabelElement(formattedArea),
+      anchor: 'center'
+    })
+    .setLngLat(center)
+    .addTo(map.current);
+    
+    drawRef.current.areaLabels.push(marker);
+    return marker;
+  };
+  
+  // Helper function to create the DOM element for area labels
+  const createAreaLabelElement = (areaText: string) => {
+    const el = document.createElement('div');
+    el.className = 'area-label';
+    el.innerHTML = `<strong>${areaText} m²</strong>`;
+    return el;
+  };
+
+  // Clean up area labels
+  const clearAreaLabels = () => {
+    drawRef.current.areaLabels.forEach(marker => marker.remove());
+    drawRef.current.areaLabels = [];
+  };
+
   const updateAllPolygonLabels = () => {
     if (!map.current || !drawRef.current.lengthLabelsSource) return;
     
@@ -81,6 +115,20 @@ const Map: React.FC = () => {
     drawRef.current.lengthLabelsSource.setData({
       type: 'FeatureCollection',
       features: allLabelFeatures
+    });
+  };
+
+  // Create area labels for all existing polygons
+  const updateAllAreaLabels = () => {
+    clearAreaLabels();
+    
+    drawnFeatures.forEach(feature => {
+      if (feature.geometry.type === 'Polygon' && feature.properties?.area) {
+        const polygon = feature.geometry as GeoJSON.Polygon;
+        const coordinates = polygon.coordinates[0];
+        const center = turf.center(turf.polygon([coordinates])).geometry.coordinates;
+        addAreaLabel(new mapboxgl.LngLat(center[0], center[1]), feature.properties.area);
+      }
     });
   };
 
@@ -136,6 +184,7 @@ const Map: React.FC = () => {
         setMeasurementResults({ area, perimeter });
         
         updateAllPolygonLabels();
+        updateAllAreaLabels();
         
         toast.success(`Polygon aktualisiert: ${area.toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
       });
@@ -434,6 +483,7 @@ const Map: React.FC = () => {
         drawRef.current.currentMarkers = [];
       }
       clearEditMarkers();
+      clearAreaLabels();
     };
   }, []);
 
@@ -454,8 +504,10 @@ const Map: React.FC = () => {
 
     resetCurrentDraw();
     clearEditMarkers();
+    clearAreaLabels();
     
     updateAllPolygonLabels();
+    updateAllAreaLabels();
 
     map.current.getCanvas().style.cursor = '';
 
@@ -490,6 +542,7 @@ const Map: React.FC = () => {
     }
     
     updateAllPolygonLabels();
+    updateAllAreaLabels();
   }, [drawnFeatures, selectedFeatureId]);
 
   const resetCurrentDraw = () => {
@@ -568,6 +621,10 @@ const Map: React.FC = () => {
         perimeter
       });
       
+      // Add area label for the new polygon
+      const polygonCenter = turf.center(polygonFeature).geometry.coordinates;
+      addAreaLabel(new mapboxgl.LngLat(polygonCenter[0], polygonCenter[1]), area);
+      
       updateAllPolygonLabels();
       
       toast.success(`Polygon erstellt: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
@@ -623,6 +680,7 @@ const Map: React.FC = () => {
   const updateMeasurements = () => {
     if (drawnFeatures.length > 0) {
       updateAllPolygonLabels();
+      updateAllAreaLabels();
     }
   };
 
