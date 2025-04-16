@@ -44,7 +44,7 @@ export function getBearing(point1: Position | [number, number], point2: Position
   return turf.bearing(from, to);
 }
 
-// Generate GeoJSON for line segment labels
+// Generate GeoJSON for line segment labels - now always horizontal to camera
 export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = [];
   
@@ -65,18 +65,12 @@ export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCo
     const end = closedCoords[i + 1];
     const midpoint = getMidpoint(start, end);
     const distance = getDistance(start, end);
-    const bearing = getBearing(start, end);
     
-    // Adjust bearing for label readability
-    const adjustedBearing = bearing > 90 || bearing < -90 
-      ? bearing + 180 
-      : bearing;
-    
+    // No rotation for camera-aligned text
     features.push({
       type: 'Feature',
       properties: {
         length: distance.toFixed(1),
-        bearing: adjustedBearing,
         index: i
       },
       geometry: {
@@ -107,10 +101,51 @@ export function calculateMeasurements(coordinates: Position[]): { area: number, 
     closedCoords.push(first);
   }
   
-  const polygon = turf.polygon([closedCoords]);
+  const polygon = turf.polygon([positionsToCoordinates(closedCoords)]);
   const area = turf.area(polygon);
-  const line = turf.lineString(closedCoords);
+  const line = turf.lineString(positionsToCoordinates(closedCoords));
   const perimeter = turf.length(line, { units: 'meters' });
   
   return { area, perimeter };
+}
+
+// Neue Funktion zum Prüfen des Punktfangs bei Polygonen
+export function checkSnapToVertex(
+  point: mapboxgl.Point, 
+  mapInstance: mapboxgl.Map,
+  vertices: Position[],
+  snapDistance: number = 10,
+  skipLastIndex: boolean = false
+): { snapped: boolean; position: Position | null; index: number } {
+  if (!vertices.length) {
+    return { snapped: false, position: null, index: -1 };
+  }
+
+  let closestDistance = Infinity;
+  let closestPoint: Position | null = null;
+  let closestIndex = -1;
+
+  // Prüft Punktfang für jeden Vertex im Polygon (außer dem letzten, falls gewünscht)
+  const endIndex = skipLastIndex ? vertices.length - 1 : vertices.length;
+  
+  for (let i = 0; i < endIndex; i++) {
+    const vertex = vertices[i];
+    const vertexPixel = mapInstance.project([vertex[0], vertex[1]]);
+    const distance = Math.sqrt(
+      Math.pow(vertexPixel.x - point.x, 2) + 
+      Math.pow(vertexPixel.y - point.y, 2)
+    );
+
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestPoint = vertex;
+      closestIndex = i;
+    }
+  }
+
+  if (closestDistance <= snapDistance && closestPoint) {
+    return { snapped: true, position: closestPoint, index: closestIndex };
+  }
+
+  return { snapped: false, position: null, index: -1 };
 }

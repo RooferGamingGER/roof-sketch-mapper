@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -7,14 +8,19 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { MAPBOX_TOKEN } from '@/config/mapbox';
 import { VertexMarker } from './VertexMarker';
-import { generateLengthLabels, calculateMeasurements, positionsToCoordinates } from '@/utils/mapUtils';
+import { 
+  generateLengthLabels, 
+  calculateMeasurements, 
+  positionsToCoordinates,
+  checkSnapToVertex
+} from '@/utils/mapUtils';
 import { Position } from 'geojson';
 
 const Map: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<{
-    currentPoints: [number, number][];
+    currentPoints: Position[];
     currentMarkers: mapboxgl.Marker[];
     editMarkers: VertexMarker[];
     currentLineSource?: mapboxgl.GeoJSONSource;
@@ -27,7 +33,7 @@ const Map: React.FC = () => {
     currentMarkers: [],
     editMarkers: [],
     snap: true,
-    snapDistance: 10
+    snapDistance: 15  // Erhöhter Wert für besseren Punktfang
   });
 
   const {
@@ -44,17 +50,33 @@ const Map: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [mapError, setMapError] = useState<string | null>(null);
   const [message, setMessage] = useState<string>('Karte wird geladen...');
+  const [hoverPoint, setHoverPoint] = useState<mapboxgl.Point | null>(null);
 
   const clearEditMarkers = () => {
     drawRef.current.editMarkers.forEach(marker => marker.remove());
     drawRef.current.editMarkers = [];
   };
 
-  const updateLengthLabels = (coordinates: Position[]) => {
+  // Immer die Maßangaben für alle Polygone anzeigen
+  const updateAllPolygonLabels = () => {
     if (!map.current || !drawRef.current.lengthLabelsSource) return;
     
-    const labels = generateLengthLabels(coordinates);
-    drawRef.current.lengthLabelsSource.setData(labels);
+    // Feature-Collection für alle Label erstellen
+    const allLabelFeatures: GeoJSON.Feature[] = [];
+    
+    drawnFeatures.forEach(feature => {
+      if (feature.geometry.type === 'Polygon') {
+        const coords = feature.geometry.coordinates[0];
+        const labels = generateLengthLabels(coords as Position[]);
+        allLabelFeatures.push(...labels.features);
+      }
+    });
+    
+    // Alle Labels auf einmal setzen
+    drawRef.current.lengthLabelsSource.setData({
+      type: 'FeatureCollection',
+      features: allLabelFeatures
+    });
   };
 
   const createEditMarkersForPolygon = (coordinates: Position[]) => {
@@ -82,7 +104,7 @@ const Map: React.FC = () => {
         const feature = drawnFeatures.find(f => f.id === selectedFeatureId);
         if (!feature || feature.geometry.type !== 'Polygon') return;
         
-        const polygonCoords = [...feature.geometry.coordinates[0]];
+        const polygonCoords = [...feature.geometry.coordinates[0] as Position[]];
         polygonCoords[vertexIndex] = [newLngLat.lng, newLngLat.lat];
         
         if (vertexIndex === 0) {
@@ -108,7 +130,8 @@ const Map: React.FC = () => {
         
         setMeasurementResults({ area, perimeter });
         
-        updateLengthLabels(polygonCoords);
+        // Alle Labels aktualisieren
+        updateAllPolygonLabels();
         
         toast.success(`Polygon aktualisiert: ${area.toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
       });
@@ -259,8 +282,7 @@ const Map: React.FC = () => {
               'text-field': '{length} m',
               'text-size': 12,
               'text-anchor': 'center',
-              'text-rotation-alignment': 'map',
-              'text-rotate': ['get', 'bearing'],
+              'text-rotation-alignment': 'viewport', // Immer zur Kamera ausgerichtet
               'text-allow-overlap': true,
               'text-letter-spacing': 0.05,
               'text-font': ['DIN Pro Medium', 'Arial Unicode MS Regular'],
@@ -289,13 +311,33 @@ const Map: React.FC = () => {
                   perimeter
                 });
                 
-                updateLengthLabels(polygon.coordinates[0]);
-                
                 toast.success(`Fläche: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
                 
                 if (drawMode === 'edit') {
-                  createEditMarkersForPolygon(polygon.coordinates[0]);
+                  createEditMarkersForPolygon(polygon.coordinates[0] as Position[]);
                 }
+              }
+            }
+          });
+
+          // Mausbewegungen für Punktfang verfolgen
+          map.current.on('mousemove', (e) => {
+            setHoverPoint(e.point);
+            
+            if (drawMode === 'draw' && drawRef.current.currentPoints.length > 0) {
+              // Nur UI-Feedback anzeigen, keine tatsächliche Operation
+              const snapResult = checkSnapToVertex(
+                e.point, 
+                map.current!, 
+                drawRef.current.currentPoints, 
+                drawRef.current.snapDistance, 
+                false
+              );
+              
+              if (snapResult.snapped) {
+                map.current.getCanvas().style.cursor = 'pointer';
+              } else {
+                map.current.getCanvas().style.cursor = 'crosshair';
               }
             }
           });
@@ -355,12 +397,8 @@ const Map: React.FC = () => {
     resetCurrentDraw();
     clearEditMarkers();
     
-    if (drawRef.current.lengthLabelsSource) {
-      drawRef.current.lengthLabelsSource.setData({
-        type: 'FeatureCollection',
-        features: []
-      });
-    }
+    // Alle Labels für alle Polygone immer anzeigen
+    updateAllPolygonLabels();
 
     map.current.getCanvas().style.cursor = '';
 
@@ -375,24 +413,17 @@ const Map: React.FC = () => {
       if (selectedFeatureId) {
         const feature = drawnFeatures.find(f => f.id === selectedFeatureId);
         if (feature && feature.geometry.type === 'Polygon') {
-          createEditMarkersForPolygon(feature.geometry.coordinates[0]);
-          updateLengthLabels(feature.geometry.coordinates[0]);
+          createEditMarkersForPolygon(feature.geometry.coordinates[0] as Position[]);
         }
       }
     } else if (drawMode === 'measure') {
       setMessage('Wählen Sie ein Polygon aus, um dessen Maße anzuzeigen.');
-      
-      if (selectedFeatureId) {
-        const feature = drawnFeatures.find(f => f.id === selectedFeatureId);
-        if (feature && feature.geometry.type === 'Polygon') {
-          updateLengthLabels(feature.geometry.coordinates[0]);
-        }
-      }
     } else {
       setMessage('');
     }
   }, [drawMode, selectedFeatureId, drawnFeatures]);
 
+  // Labels immer neu laden, wenn sich die Features ändern
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded()) return;
 
@@ -404,12 +435,8 @@ const Map: React.FC = () => {
       });
     }
     
-    if (!selectedFeatureId && drawRef.current.lengthLabelsSource) {
-      drawRef.current.lengthLabelsSource.setData({
-        type: 'FeatureCollection',
-        features: []
-      });
-    }
+    // Labels für alle Polygone aktualisieren
+    updateAllPolygonLabels();
   }, [drawnFeatures, selectedFeatureId]);
 
   const resetCurrentDraw = () => {
@@ -440,13 +467,13 @@ const Map: React.FC = () => {
     }
   };
 
-  const checkSnapToFirst = (point: mapboxgl.Point): [number, number] | null => {
+  const checkSnapToFirst = (point: mapboxgl.Point): Position | null => {
     if (drawRef.current.currentPoints.length < 3) return null;
 
     const firstPoint = drawRef.current.currentPoints[0];
     if (!map.current || !firstPoint) return null;
 
-    const firstPointPixel = map.current.project(firstPoint as mapboxgl.LngLatLike);
+    const firstPointPixel = map.current.project([firstPoint[0], firstPoint[1]]);
     const distance = Math.sqrt(
       Math.pow(firstPointPixel.x - point.x, 2) + 
       Math.pow(firstPointPixel.y - point.y, 2)
@@ -462,14 +489,15 @@ const Map: React.FC = () => {
     if (!map.current || drawMode !== 'draw') return;
 
     const point = e.point;
-    let coords: [number, number];
+    let coords: Position;
     
+    // Prüfen, ob zum ersten Punkt geschnappt werden soll (Polygon schließen)
     const snapPoint = checkSnapToFirst(point);
     if (snapPoint) {
       coords = snapPoint;
       
       const polygonCoords = [...drawRef.current.currentPoints, snapPoint];
-      const polygonFeature = turf.polygon([[...polygonCoords, polygonCoords[0]]]);
+      const polygonFeature = turf.polygon([positionsToCoordinates(polygonCoords)]);
       polygonFeature.id = `polygon-${Date.now()}`;
       
       const { area, perimeter } = calculateMeasurements(polygonCoords);
@@ -488,14 +516,15 @@ const Map: React.FC = () => {
         perimeter
       });
       
-      updateLengthLabels(polygonCoords);
+      // Labels für alle Polygone aktualisieren
+      updateAllPolygonLabels();
       
       toast.success(`Polygon erstellt: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
       
       resetCurrentDraw();
       return;
     } else {
-      coords = [e.lngLat.lng, e.lngLat.lat] as [number, number];
+      coords = [e.lngLat.lng, e.lngLat.lat];
     }
 
     drawRef.current.currentPoints.push(coords);
@@ -511,7 +540,7 @@ const Map: React.FC = () => {
         properties: {},
         geometry: {
           type: 'LineString',
-          coordinates: drawRef.current.currentPoints
+          coordinates: positionsToCoordinates(drawRef.current.currentPoints)
         }
       });
     }
@@ -523,14 +552,17 @@ const Map: React.FC = () => {
         properties: {},
         geometry: {
           type: 'Polygon',
-          coordinates: [[...tempPolygonCoords, tempPolygonCoords[0]]]
+          coordinates: [positionsToCoordinates([...tempPolygonCoords, tempPolygonCoords[0]])]
         }
       });
     }
   };
 
   const updateMeasurements = () => {
-    // This function can be used for any measurement updates needed during map movements
+    // Label-Aktualisierung bei Kartenbewegung
+    if (drawnFeatures.length > 0) {
+      updateAllPolygonLabels();
+    }
   };
 
   return (
