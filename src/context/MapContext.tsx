@@ -1,13 +1,13 @@
 
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import * as turf from '@turf/turf';
+import { MAPBOX_TOKEN } from '../config/mapbox';
 
 export type DrawMode = 'draw' | 'edit' | 'delete' | 'measure' | null;
 export type MapFeature = GeoJSON.Feature;
 
 interface MapContextType {
-  mapboxToken: string;
-  setMapboxToken: (token: string) => void;
+  mapboxToken: string;  // We keep this for compatibility
   drawMode: DrawMode;
   setDrawMode: (mode: DrawMode) => void;
   selectedAddress: string | null;
@@ -30,7 +30,9 @@ interface MapContextType {
 const MapContext = createContext<MapContextType | undefined>(undefined);
 
 export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [mapboxToken, setMapboxToken] = useState<string>('');
+  // We're now using the constant token instead of state
+  const mapboxToken = MAPBOX_TOKEN;
+  
   const [drawMode, setDrawMode] = useState<DrawMode>(null);
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
   const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
@@ -60,7 +62,6 @@ export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     <MapContext.Provider
       value={{
         mapboxToken,
-        setMapboxToken,
         drawMode,
         setDrawMode,
         selectedAddress,

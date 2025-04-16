@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Map from '@/components/Map';
 import AddressSearch from '@/components/AddressSearch';
 import DrawingToolbar from '@/components/DrawingToolbar';
-import TokenInput from '@/components/TokenInput';
 import { MapProvider } from '@/context/MapContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
@@ -21,7 +20,7 @@ const RoofMapper: React.FC = () => {
             <Tabs defaultValue="map" className="w-full">
               <TabsList className="mb-4">
                 <TabsTrigger value="map">Karte & Zeichnen</TabsTrigger>
-                <TabsTrigger value="settings">Einstellungen</TabsTrigger>
+                <TabsTrigger value="settings">Über</TabsTrigger>
               </TabsList>
               
               <TabsContent value="map" className="space-y-4">
@@ -41,17 +40,19 @@ const RoofMapper: React.FC = () => {
               <TabsContent value="settings">
                 <div className="space-y-4">
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Mapbox-Konfiguration</h3>
-                    <TokenInput />
+                    <h3 className="text-sm font-medium mb-2">Über diese App</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Mit dieser App können Dachdecker Dächer auf einer Karte markieren und vermessen.
+                      Zeichnen Sie Polygone, um Dachflächen zu markieren und deren Fläche und Umfang zu berechnen.
+                    </p>
                   </div>
                   
                   <Separator />
                   
                   <div>
-                    <h3 className="text-sm font-medium mb-2">Über diese App</h3>
+                    <h3 className="text-sm font-medium mb-2">Version</h3>
                     <p className="text-sm text-muted-foreground">
-                      Mit dieser App können Dachdecker Dächer auf einer Karte markieren und vermessen.
-                      Zeichnen Sie Polygone, um Dachflächen zu markieren und deren Fläche und Umfang zu berechnen.
+                      Dach-Sketch Mapper v1.0.0
                     </p>
                   </div>
                 </div>

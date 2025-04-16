@@ -5,12 +5,13 @@ import * as turf from '@turf/turf';
 import { useMapContext } from '@/context/MapContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { MAPBOX_TOKEN } from '@/config/mapbox';
 
 const Map: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement | null>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const drawRef = useRef<{
-    currentPoints: [number, number][];  // Updated to ensure tuple type
+    currentPoints: [number, number][];
     currentMarkers: mapboxgl.Marker[];
     currentLineSource?: mapboxgl.GeoJSONSource;
     currentPolygonSource?: mapboxgl.GeoJSONSource;
@@ -24,7 +25,6 @@ const Map: React.FC = () => {
   });
 
   const {
-    mapboxToken,
     coordinates,
     drawMode,
     addFeature,
@@ -35,15 +35,21 @@ const Map: React.FC = () => {
   } = useMapContext();
 
   const [isLoading, setIsLoading] = useState(true);
-  const [message, setMessage] = useState<string>('Bitte geben Sie Mapbox-Token ein und suchen Sie eine Adresse.');
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string>('Karte wird geladen...');
 
   useEffect(() => {
-    if (!mapboxToken || !mapContainer.current) {
-      return;
-    }
+    if (!mapContainer.current) return;
+    
+    const loadTimeout = setTimeout(() => {
+      if (isLoading) {
+        setMapError('Die Karte konnte nicht geladen werden. Bitte aktualisieren Sie die Seite.');
+        setIsLoading(false);
+      }
+    }, 15000);
 
     try {
-      mapboxgl.accessToken = mapboxToken;
+      mapboxgl.accessToken = MAPBOX_TOKEN;
 
       if (!map.current) {
         setIsLoading(true);
@@ -53,7 +59,8 @@ const Map: React.FC = () => {
           zoom: 18,
           pitch: 45,
           bearing: 0,
-          attributionControl: false
+          attributionControl: false,
+          center: [13.4050, 52.5200],
         });
 
         map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -184,6 +191,14 @@ const Map: React.FC = () => {
 
           setIsLoading(false);
           setMessage('Karte geladen. Sie können nun mit dem Zeichnen beginnen.');
+          clearTimeout(loadTimeout);
+        });
+
+        map.current.on('error', (e) => {
+          console.error('Mapbox Error:', e);
+          setMapError('Fehler beim Laden der Karte: ' + (e.error?.message || 'Unbekannter Fehler'));
+          setIsLoading(false);
+          clearTimeout(loadTimeout);
         });
 
         map.current.on('move', () => {
@@ -192,17 +207,19 @@ const Map: React.FC = () => {
       }
     } catch (error) {
       console.error('Fehler beim Initialisieren der Karte:', error);
-      toast.error('Fehler beim Laden der Karte. Bitte prüfen Sie Ihren Mapbox-Token.');
-      setMessage('Fehler beim Laden der Karte. Bitte prüfen Sie Ihren Mapbox-Token.');
+      setMapError('Fehler beim Laden der Karte. Bitte aktualisieren Sie die Seite.');
+      setIsLoading(false);
+      clearTimeout(loadTimeout);
     }
 
     return () => {
+      clearTimeout(loadTimeout);
       if (drawRef.current.currentMarkers.length > 0) {
         drawRef.current.currentMarkers.forEach(marker => marker.remove());
         drawRef.current.currentMarkers = [];
       }
     };
-  }, [mapboxToken]);
+  }, []);
 
   useEffect(() => {
     if (!map.current || !coordinates) return;
@@ -375,10 +392,24 @@ const Map: React.FC = () => {
         </div>
       )}
 
-      {(!mapboxToken || !coordinates) && !isLoading && (
+      {mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 p-6">
           <div className="text-center max-w-md">
-            <p className="text-dach-primary font-medium">{message}</p>
+            <p className="text-destructive font-medium">{mapError}</p>
+            <button 
+              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm"
+              onClick={() => window.location.reload()}
+            >
+              Seite neu laden
+            </button>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && !coordinates && !mapError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 p-6">
+          <div className="text-center max-w-md">
+            <p className="text-dach-primary font-medium">Bitte suchen Sie eine Adresse, um mit der Kartendarstellung zu beginnen.</p>
           </div>
         </div>
       )}
