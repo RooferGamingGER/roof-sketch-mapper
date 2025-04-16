@@ -43,8 +43,10 @@ const DrawingToolbar: React.FC = () => {
       deleteFeature(selectedFeatureId);
       toast.success('Polygon wurde gelöscht');
     } else if (drawnFeatures.length > 0) {
+      // Force UI update by checking after the delete function completes
+      const featureCount = drawnFeatures.length;
       deleteAllFeatures();
-      toast.success('Alle Polygone wurden gelöscht');
+      toast.success(`${featureCount} Polygon${featureCount !== 1 ? 'e' : ''} wurden gelöscht`);
     } else {
       toast.error('Keine Polygone zum Löschen vorhanden');
     }

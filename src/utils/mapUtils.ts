@@ -68,8 +68,12 @@ export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCo
   for (let i = 0; i < closedCoords.length - 1; i++) {
     const start = closedCoords[i];
     const end = closedCoords[i + 1];
-    const midpoint = getMidpoint(start, end);
     const distance = getDistance(start, end);
+    
+    // Skip labels for segments that are effectively 0 meters (points that are too close)
+    if (distance < 0.1) continue;
+    
+    const midpoint = getMidpoint(start, end);
     
     // No rotation for camera-aligned text
     features.push({

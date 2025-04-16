@@ -64,6 +64,16 @@ export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setDrawnFeatures([]);
     setSelectedFeatureId(null);
     setMeasurementResults({ area: null, perimeter: null });
+    // Force redraw by setting draw mode to null
+    setDrawMode(prevMode => {
+      if (prevMode !== null) {
+        // If we were in a draw mode, temporarily set to null to force redraw
+        const currentMode = prevMode;
+        setTimeout(() => setDrawMode(currentMode), 50);
+        return null;
+      }
+      return prevMode;
+    });
   };
 
   return (
