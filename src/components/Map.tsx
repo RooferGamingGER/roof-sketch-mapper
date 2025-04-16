@@ -197,8 +197,8 @@ const Map: React.FC = () => {
   useEffect(() => {
     if (!map.current) return;
 
-    map.current.off('click', handleMapClick);
-    map.current.off('contextmenu', handleRightClick);
+    map.current.off('click', handleMapClickWrapper as any);
+    map.current.off('contextmenu', handleRightClickWrapper as any);
 
     resetCurrentDraw();
     clearEditMarkers();
@@ -209,15 +209,24 @@ const Map: React.FC = () => {
 
     map.current.getCanvas().style.cursor = '';
 
+    // Define wrapper functions outside the conditional blocks
+    // This ensures they're created only once per effect run
+    const handleMapClickWrapper = (e: mapboxgl.MapMouseEvent) => {
+      if (map.current) {
+        handleMapClick(e, map.current, drawMode, updateAllPolygonLabels, updateMeasurements);
+      }
+    };
+
+    const handleRightClickWrapper = (e: mapboxgl.MapMouseEvent) => {
+      if (map.current) {
+        handleRightClick(e, map.current, drawMode);
+      }
+    };
+
     if (drawMode === 'draw') {
-      // Fix: Wrap the event handlers to properly pass the required arguments
-      map.current.on('click', (e) => {
-        handleMapClick(e, map.current!, drawMode, updateAllPolygonLabels, updateMeasurements);
-      });
-      
-      map.current.on('contextmenu', (e) => {
-        handleRightClick(e, map.current!, drawMode);
-      });
+      // Add event listeners with the wrapper functions
+      map.current.on('click', handleMapClickWrapper);
+      map.current.on('contextmenu', handleRightClickWrapper);
       
       map.current.getCanvas().style.cursor = 'crosshair';
       setMessage('Klicken Sie auf die Karte, um Punkte hinzuzufügen. Rechtsklick oder Klicken auf den ersten Punkt zum Abschließen.');
