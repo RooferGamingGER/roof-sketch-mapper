@@ -53,6 +53,7 @@ const Map: React.FC = () => {
   const [mapError, setMapError] = useState<string | null>(null);
   const [message, setMessage] = useState<string>('Karte wird geladen...');
   const [hoverPoint, setHoverPoint] = useState<mapboxgl.Point | null>(null);
+  const [hasShownOutOfNRWWarning, setHasShownOutOfNRWWarning] = useState(false);
   
   const nrwBounds = {
     north: 52.5314,
@@ -489,7 +490,12 @@ const Map: React.FC = () => {
               } else {
                 map.current.setLayoutProperty('nrw-satellite-tiles', 'visibility', 'none');
                 map.current.setLayoutProperty('mapbox-satellite-tiles', 'visibility', 'visible');
-                toast.warning('Sie befinden sich außerhalb von Nordrhein-Westfalen. Es werden Mapbox-Satellitenbilder angezeigt.');
+                
+                if (!hasShownOutOfNRWWarning) {
+                  toast.warning('Sie befinden sich außerhalb von Nordrhein-Westfalen. Es werden Mapbox-Satellitenbilder angezeigt.');
+                  setHasShownOutOfNRWWarning(true);
+                }
+                
                 setMessage('Sie befinden sich außerhalb von NRW. Mapbox-Satellitenbilder werden angezeigt.');
               }
             } else {
