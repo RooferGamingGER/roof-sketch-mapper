@@ -70,7 +70,8 @@ export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCo
       type: 'Feature',
       properties: {
         length: `${distance.toFixed(1)} m`,
-        index: i
+        index: i,
+        bearing: getBearing(start, end) // Add bearing for label rotation
       },
       geometry: {
         type: 'Point',
@@ -78,6 +79,42 @@ export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCo
       }
     });
   }
+  
+  return {
+    type: 'FeatureCollection',
+    features
+  };
+}
+
+// Generate separate GeoJSON for temporary line labels during drawing
+export function generateTempLengthLabels(coordinates: Position[], movePoint: Position | null): GeoJSON.FeatureCollection {
+  const features: GeoJSON.Feature[] = [];
+  
+  if (coordinates.length < 1 || !movePoint) return { type: 'FeatureCollection', features };
+  
+  // Create a label for the temporary segment
+  const start = coordinates[coordinates.length - 1];
+  const end = movePoint;
+  const distance = getDistance(start, end);
+  
+  // Skip labels for segments that are effectively 0 meters (points that are too close)
+  if (distance < 0.1) return { type: 'FeatureCollection', features };
+  
+  const midpoint = getMidpoint(start, end);
+  
+  features.push({
+    type: 'Feature',
+    properties: {
+      length: `${distance.toFixed(1)} m`,
+      index: coordinates.length - 1,
+      bearing: getBearing(start, end),
+      temporary: true
+    },
+    geometry: {
+      type: 'Point',
+      coordinates: midpoint
+    }
+  });
   
   return {
     type: 'FeatureCollection',
@@ -108,7 +145,7 @@ export function calculateMeasurements(coordinates: Position[]): { area: number, 
   return { area, perimeter };
 }
 
-// Funktion zum Prüfen des Punktfangs bei Polygonen
+// Function to check if a point is close to a vertex for snapping
 export function checkSnapToVertex(
   point: mapboxgl.Point, 
   mapInstance: mapboxgl.Map,
@@ -124,7 +161,7 @@ export function checkSnapToVertex(
   let closestPoint: Position | null = null;
   let closestIndex = -1;
 
-  // Prüft Punktfang für jeden Vertex im Polygon (außer dem letzten, falls gewünscht)
+  // Check snapping for each vertex in the polygon (except the last one, if requested)
   const endIndex = skipLastIndex ? vertices.length - 1 : vertices.length;
   
   for (let i = 0; i < endIndex; i++) {
@@ -148,3 +185,4 @@ export function checkSnapToVertex(
 
   return { snapped: false, position: null, index: -1 };
 }
+

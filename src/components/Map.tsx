@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -8,7 +9,8 @@ import { cn } from '@/lib/utils';
 import { MAPBOX_TOKEN } from '@/config/mapbox';
 import { VertexMarker } from './VertexMarker';
 import { 
-  generateLengthLabels, 
+  generateLengthLabels,
+  generateTempLengthLabels, 
   calculateMeasurements, 
   positionsToCoordinates,
   checkSnapToVertex,
@@ -26,16 +28,19 @@ const Map: React.FC = () => {
     currentLineSource?: mapboxgl.GeoJSONSource;
     currentPolygonSource?: mapboxgl.GeoJSONSource;
     lengthLabelsSource?: mapboxgl.GeoJSONSource;
+    tempLabelsSource?: mapboxgl.GeoJSONSource;
     areaLabels: mapboxgl.Marker[];
     snap: boolean;
     snapDistance: number;
+    lastMousePosition: Position | null;
   }>({
     currentPoints: [],
     currentMarkers: [],
     editMarkers: [],
     areaLabels: [],
     snap: true,
-    snapDistance: 15
+    snapDistance: 15,
+    lastMousePosition: null
   });
 
   const {
@@ -112,6 +117,7 @@ const Map: React.FC = () => {
     
     const allLabelFeatures: GeoJSON.Feature[] = [];
     
+    // Add labels for all saved polygons
     drawnFeatures.forEach(feature => {
       if (feature.geometry.type === 'Polygon') {
         const coords = feature.geometry.coordinates[0];
@@ -120,22 +126,27 @@ const Map: React.FC = () => {
       }
     });
     
+    // Only add labels for the current drawing if we're in draw mode
     if (drawMode === 'draw' && drawRef.current.currentPoints.length >= 2) {
-      const tempPolygonCoords = [...drawRef.current.currentPoints];
-      if (tempPolygonCoords.length >= 3) {
-        const tempClosedPolygon = [...tempPolygonCoords, tempPolygonCoords[0]];
-        const tempLabels = generateLengthLabels(tempClosedPolygon);
-        allLabelFeatures.push(...tempLabels.features);
-      } else {
-        const tempLineLabels = generateLengthLabels(tempPolygonCoords);
-        allLabelFeatures.push(...tempLineLabels.features);
-      }
+      const labels = generateLengthLabels(drawRef.current.currentPoints);
+      allLabelFeatures.push(...labels.features);
     }
     
+    // Update the labels source
     drawRef.current.lengthLabelsSource.setData({
       type: 'FeatureCollection',
       features: allLabelFeatures
     });
+    
+    // Update temporary label if we have a mouse position
+    if (drawRef.current.tempLabelsSource && drawRef.current.lastMousePosition && drawRef.current.currentPoints.length > 0) {
+      const tempLabels = generateTempLengthLabels(
+        drawRef.current.currentPoints,
+        drawRef.current.lastMousePosition
+      );
+      
+      drawRef.current.tempLabelsSource.setData(tempLabels);
+    }
   };
 
   const updateAllAreaLabels = () => {
@@ -157,6 +168,7 @@ const Map: React.FC = () => {
     clearEditMarkers();
 
     coordinates.forEach((coord, index) => {
+      // Skip the last point if it's the same as the first (closing point)
       if (index === coordinates.length - 1 && 
           coordinates[0][0] === coord[0] && 
           coordinates[0][1] === coord[1]) {
@@ -179,6 +191,7 @@ const Map: React.FC = () => {
         const polygonCoords = [...feature.geometry.coordinates[0] as Position[]];
         polygonCoords[vertexIndex] = [newLngLat.lng, newLngLat.lat];
         
+        // If we're moving the first vertex, also update the closing vertex
         if (vertexIndex === 0) {
           polygonCoords[polygonCoords.length - 1] = [newLngLat.lng, newLngLat.lat];
         }
@@ -210,6 +223,15 @@ const Map: React.FC = () => {
       
       drawRef.current.editMarkers.push(marker);
     });
+  };
+
+  // Define wrapper functions here before they are used
+  const handleMapClickWrapper = (e: mapboxgl.MapMouseEvent) => {
+    handleMapClick(e);
+  };
+
+  const handleRightClickWrapper = (e: mapboxgl.MapMouseEvent) => {
+    handleRightClick(e);
   };
 
   useEffect(() => {
@@ -300,6 +322,7 @@ const Map: React.FC = () => {
         map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-right');
 
         map.current.on('load', () => {
+          // Set up sources for current line and polygon
           map.current?.addSource('current-line', {
             type: 'geojson',
             data: {
@@ -324,6 +347,7 @@ const Map: React.FC = () => {
             }
           });
           
+          // Add source for permanent length labels
           map.current?.addSource('length-labels', {
             type: 'geojson',
             data: {
@@ -331,7 +355,17 @@ const Map: React.FC = () => {
               features: []
             }
           });
+          
+          // Add source for temporary length labels (during drawing)
+          map.current?.addSource('temp-labels', {
+            type: 'geojson',
+            data: {
+              type: 'FeatureCollection',
+              features: []
+            }
+          });
 
+          // Add layers with improved styling for visibility
           map.current?.addLayer({
             id: 'current-line-layer',
             type: 'line',
@@ -342,7 +376,7 @@ const Map: React.FC = () => {
             },
             paint: {
               'line-color': '#e67e22',
-              'line-width': 2.5,
+              'line-width': 3,
               'line-dasharray': [2, 1]
             }
           });
@@ -367,7 +401,7 @@ const Map: React.FC = () => {
             },
             paint: {
               'line-color': '#e67e22',
-              'line-width': 2.5
+              'line-width': 3
             }
           });
 
@@ -409,27 +443,53 @@ const Map: React.FC = () => {
                 '#3498db',
                 '#1a365d'
               ],
-              'line-width': 2.5
+              'line-width': 3
             }
           });
           
+          // Layer for permanent length labels with improved visibility
           map.current?.addLayer({
             id: 'length-labels',
             type: 'symbol',
             source: 'length-labels',
             layout: {
               'text-field': ['get', 'length'],
-              'text-size': 12,
+              'text-size': 14,
               'text-anchor': 'center',
               'text-allow-overlap': true,
               'text-letter-spacing': 0.05,
               'text-font': ['Open Sans Regular'],
-              'text-padding': 3
+              'text-padding': 3,
+              'text-rotate': ['get', 'bearing'],
+              'symbol-placement': 'point'
             },
             paint: {
               'text-color': '#ffffff',
               'text-halo-color': '#3498db',
-              'text-halo-width': 1.5
+              'text-halo-width': 2
+            }
+          });
+          
+          // Layer for temporary length labels during drawing
+          map.current?.addLayer({
+            id: 'temp-labels',
+            type: 'symbol',
+            source: 'temp-labels',
+            layout: {
+              'text-field': ['get', 'length'],
+              'text-size': 14,
+              'text-anchor': 'center',
+              'text-allow-overlap': true,
+              'text-letter-spacing': 0.05,
+              'text-font': ['Open Sans Regular'],
+              'text-padding': 3,
+              'text-rotate': ['get', 'bearing'],
+              'symbol-placement': 'point'
+            },
+            paint: {
+              'text-color': '#ffffff',
+              'text-halo-color': '#e67e22',
+              'text-halo-width': 2
             }
           });
 
@@ -462,6 +522,9 @@ const Map: React.FC = () => {
             setHoverPoint(e.point);
             
             if (drawMode === 'draw' && drawRef.current.currentPoints.length > 0) {
+              // Store the current mouse position for temporary labels
+              drawRef.current.lastMousePosition = [e.lngLat.lng, e.lngLat.lat];
+              
               const snapResult = checkSnapToVertex(
                 e.point, 
                 map.current!, 
@@ -481,6 +544,7 @@ const Map: React.FC = () => {
                 if (movePoint) {
                   const tempPoints = [...drawRef.current.currentPoints, movePoint];
                   
+                  // Update the current line as you draw
                   drawRef.current.currentLineSource.setData({
                     type: 'Feature',
                     properties: {},
@@ -490,23 +554,29 @@ const Map: React.FC = () => {
                     }
                   });
 
-                  if (drawRef.current.currentPoints.length >= 3 && drawRef.current.currentPolygonSource) {
+                  // Only show polygon preview if we have at least 3 points
+                  if (drawRef.current.currentPoints.length >= 2 && drawRef.current.currentPolygonSource) {
                     const tempPolygonCoords = [...drawRef.current.currentPoints, movePoint];
-                    if (tempPolygonCoords.length >= 3) {
-                      drawRef.current.currentPolygonSource.setData({
-                        type: 'Feature',
-                        properties: {},
-                        geometry: {
-                          type: 'Polygon',
-                          coordinates: [positionsToCoordinates([...tempPolygonCoords, tempPolygonCoords[0]])]
-                        }
-                      });
-                    }
+                    drawRef.current.currentPolygonSource.setData({
+                      type: 'Feature',
+                      properties: {},
+                      geometry: {
+                        type: 'Polygon',
+                        coordinates: [positionsToCoordinates([...tempPolygonCoords, tempPolygonCoords[0]])]
+                      }
+                    });
                   }
                   
-                  if (drawRef.current.lengthLabelsSource) {
-                    updateAllPolygonLabels();
+                  // Update labels during drawing
+                  if (drawRef.current.tempLabelsSource) {
+                    const tempLabels = generateTempLengthLabels(
+                      drawRef.current.currentPoints,
+                      movePoint
+                    );
+                    drawRef.current.tempLabelsSource.setData(tempLabels);
                   }
+                  
+                  updateAllPolygonLabels();
                 }
               }
             }
@@ -515,6 +585,7 @@ const Map: React.FC = () => {
           drawRef.current.currentLineSource = map.current?.getSource('current-line') as mapboxgl.GeoJSONSource;
           drawRef.current.currentPolygonSource = map.current?.getSource('current-polygon') as mapboxgl.GeoJSONSource;
           drawRef.current.lengthLabelsSource = map.current?.getSource('length-labels') as mapboxgl.GeoJSONSource;
+          drawRef.current.tempLabelsSource = map.current?.getSource('temp-labels') as mapboxgl.GeoJSONSource;
 
           setIsLoading(false);
           setMessage('Karte geladen. Sie können nun mit dem Zeichnen beginnen.');
@@ -595,8 +666,8 @@ const Map: React.FC = () => {
   useEffect(() => {
     if (!map.current) return;
 
-    map.current.off('click', handleMapClick);
-    map.current.off('contextmenu', handleRightClick);
+    map.current.off('click', handleMapClickWrapper);
+    map.current.off('contextmenu', handleRightClickWrapper);
 
     resetCurrentDraw();
     clearEditMarkers();
@@ -608,8 +679,8 @@ const Map: React.FC = () => {
     map.current.getCanvas().style.cursor = '';
 
     if (drawMode === 'draw') {
-      map.current.on('click', handleMapClick);
-      map.current.on('contextmenu', handleRightClick);
+      map.current.on('click', handleMapClickWrapper);
+      map.current.on('contextmenu', handleRightClickWrapper);
       map.current.getCanvas().style.cursor = 'crosshair';
       setMessage('Klicken Sie auf die Karte, um Punkte hinzuzufügen. Rechtsklick oder Klicken auf den ersten Punkt zum Abschließen.');
     } else if (drawMode === 'edit') {
@@ -668,9 +739,18 @@ const Map: React.FC = () => {
         }
       });
     }
+    
+    // Clear temporary labels when resetting
+    if (drawRef.current.tempLabelsSource) {
+      drawRef.current.tempLabelsSource.setData({
+        type: 'FeatureCollection',
+        features: []
+      });
+    }
   };
 
   const checkSnapToFirst = (point: mapboxgl.Point): Position | null => {
+    // Only allow snapping to first point if we have at least 3 points
     if (drawRef.current.currentPoints.length < 3) return null;
 
     const firstPoint = drawRef.current.currentPoints[0];
@@ -689,18 +769,21 @@ const Map: React.FC = () => {
   };
 
   const completePolygon = () => {
+    // Ensure we have at least 3 points for a valid polygon
     if (drawRef.current.currentPoints.length < 3) {
       toast.error('Ein Polygon benötigt mindestens 3 Punkte');
       return false;
     }
 
     const firstPoint = drawRef.current.currentPoints[0];
+    // Create a closed polygon by adding the first point again at the end
     const polygonCoords = [...drawRef.current.currentPoints, firstPoint];
     const polygonFeature = turf.polygon([positionsToCoordinates(polygonCoords)]);
     polygonFeature.id = `polygon-${Date.now()}`;
     
     const { area, perimeter } = calculateMeasurements(polygonCoords);
     
+    // Add area and perimeter to polygon properties
     polygonFeature.properties = {
       id: polygonFeature.id,
       area,
@@ -727,12 +810,19 @@ const Map: React.FC = () => {
   };
   
   const handleRightClick = (e: mapboxgl.MapMouseEvent) => {
-    if (!map.current || drawMode !== 'draw' || drawRef.current.currentPoints.length < 3) {
+    if (!map.current || drawMode !== 'draw') {
       return;
     }
     
+    // Prevent default context menu
     e.preventDefault();
-    completePolygon();
+    
+    // Only complete polygon if we have at least 3 points
+    if (drawRef.current.currentPoints.length >= 3) {
+      completePolygon();
+    } else {
+      toast.error('Ein Polygon benötigt mindestens 3 Punkte');
+    }
   };
 
   const handleMapClick = (e: mapboxgl.MapMouseEvent) => {
@@ -741,8 +831,9 @@ const Map: React.FC = () => {
     const point = e.point;
     let coords: Position;
     
+    // Check if we're clicking on the first point to close the polygon
     const snapPoint = checkSnapToFirst(point);
-    if (snapPoint) {
+    if (snapPoint && drawRef.current.currentPoints.length >= 3) {
       coords = snapPoint;
       completePolygon();
       return;
@@ -750,13 +841,20 @@ const Map: React.FC = () => {
       coords = [e.lngLat.lng, e.lngLat.lat];
     }
 
+    // Add the new point
     drawRef.current.currentPoints.push(coords);
 
-    const marker = new mapboxgl.Marker({ color: '#e67e22', scale: 0.7 })
+    // Create a marker for the clicked point
+    const marker = new mapboxgl.Marker({ 
+      color: '#e67e22', 
+      scale: 0.7,
+      draggable: false
+    })
       .setLngLat(positionToLngLat(coords))
       .addTo(map.current);
     drawRef.current.currentMarkers.push(marker);
 
+    // Update the line being drawn
     if (drawRef.current.currentLineSource) {
       drawRef.current.currentLineSource.setData({
         type: 'Feature',
@@ -768,6 +866,7 @@ const Map: React.FC = () => {
       });
     }
 
+    // Only show polygon preview if we have at least 3 points
     if (drawRef.current.currentPoints.length >= 3 && drawRef.current.currentPolygonSource) {
       const tempPolygonCoords = [...drawRef.current.currentPoints];
       drawRef.current.currentPolygonSource.setData({
@@ -780,10 +879,12 @@ const Map: React.FC = () => {
       });
     }
     
+    // Update length labels for the drawn line segments
     if (drawRef.current.lengthLabelsSource && drawRef.current.currentPoints.length >= 2) {
       updateAllPolygonLabels();
     }
 
+    // Calculate and display measurements if we have enough points for a polygon
     if (drawRef.current.currentPoints.length >= 3) {
       const tempPolygonCoords = [...drawRef.current.currentPoints];
       const { area, perimeter } = calculateMeasurements([...tempPolygonCoords, tempPolygonCoords[0]]);
