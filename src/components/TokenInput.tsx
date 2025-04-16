@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -19,7 +18,7 @@ import { Key, Info } from 'lucide-react';
 
 const TokenInput: React.FC = () => {
   const { mapboxToken, setMapboxToken } = useMapContext();
-  const [token, setToken] = useState(mapboxToken);
+  const [token, setToken] = useState(mapboxToken || 'pk.eyJ1Ijoicm9vZmVyZ2FtaW5nIiwiYSI6ImNtOHduem92dTE0dHAya3NldWRuMHVlN2UifQ.p1DH0hDh_k_1fp9HIXoVKQ');
 
   // Funktion zum Speichern des Tokens
   const saveToken = () => {
@@ -35,11 +34,10 @@ const TokenInput: React.FC = () => {
 
   // Lade den Token aus dem localStorage beim ersten Laden
   React.useEffect(() => {
-    const savedToken = localStorage.getItem('mapbox-token');
-    if (savedToken) {
-      setToken(savedToken);
-      setMapboxToken(savedToken);
-    }
+    // Setze den Standard-Token, wenn keiner im localStorage ist
+    const savedToken = localStorage.getItem('mapbox-token') || 'pk.eyJ1Ijoicm9vZmVyZ2FtaW5nIiwiYSI6ImNtOHduem92dTE0dHAya3NldWRuMHVlN2UifQ.p1DH0hDh_k_1fp9HIXoVKQ';
+    setToken(savedToken);
+    setMapboxToken(savedToken);
   }, []);
 
   return (

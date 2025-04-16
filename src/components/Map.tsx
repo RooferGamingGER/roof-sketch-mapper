@@ -327,7 +327,7 @@ const Map: React.FC = () => {
       resetCurrentDraw();
       return;
     } else {
-      coords = [e.lngLat.lng, e.lngLat.lat];
+      coords = [e.lngLat.lng, e.lngLat.lat] as [number, number];
     }
 
     drawRef.current.currentPoints.push(coords);
