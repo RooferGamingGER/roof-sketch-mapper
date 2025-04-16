@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import Map from '@/components/Map';
 import AddressSearch from '@/components/AddressSearch';
 import DrawingToolbar from '@/components/DrawingToolbar';
@@ -12,10 +12,7 @@ const RoofMapper: React.FC = () => {
     <MapProvider>
       <div className="flex flex-col gap-6">
         <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-xl">Dach-Flächen Mapper</CardTitle>
-          </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4">
             <div className="space-y-4">
               <AddressSearch />
               
