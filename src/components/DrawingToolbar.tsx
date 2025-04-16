@@ -5,9 +5,7 @@ import {
   Pencil,
   Edit,
   Trash2,
-  Ruler,
   X,
-  Save
 } from 'lucide-react';
 import { useMapContext, DrawMode } from '@/context/MapContext';
 import { toast } from 'sonner';
@@ -25,6 +23,8 @@ const DrawingToolbar: React.FC = () => {
     setDrawMode, 
     selectedFeatureId, 
     deleteFeature,
+    deleteAllFeatures,
+    drawnFeatures,
     measurementResults
   } = useMapContext();
 
@@ -37,13 +37,16 @@ const DrawingToolbar: React.FC = () => {
     }
   };
 
-  // Funktion zum Löschen des ausgewählten Polygons
+  // Funktion zum Löschen des ausgewählten Polygons oder aller Polygone
   const handleDelete = () => {
     if (selectedFeatureId) {
       deleteFeature(selectedFeatureId);
       toast.success('Polygon wurde gelöscht');
+    } else if (drawnFeatures.length > 0) {
+      deleteAllFeatures();
+      toast.success('Alle Polygone wurden gelöscht');
     } else {
-      toast.error('Bitte wählen Sie zuerst ein Polygon aus');
+      toast.error('Keine Polygone zum Löschen vorhanden');
     }
   };
 
@@ -90,42 +93,26 @@ const DrawingToolbar: React.FC = () => {
             </TooltipContent>
           </Tooltip>
 
-          {/* Messen-Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={drawMode === 'measure' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setMode('measure')}
-                className={cn(
-                  drawMode === 'measure' && 'bg-dach-primary hover:bg-dach-primary/90 text-white'
-                )}
-              >
-                <Ruler className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Messen</p>
-            </TooltipContent>
-          </Tooltip>
-
-          {/* Löschen-Button */}
+          {/* Löschen-Button - jetzt für einzelne oder alle Polygone */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="outline"
                 size="icon"
                 onClick={handleDelete}
-                disabled={!selectedFeatureId}
+                disabled={drawnFeatures.length === 0}
                 className={cn(
-                  selectedFeatureId && 'hover:bg-red-100 hover:text-red-500'
+                  'hover:bg-red-100 hover:text-red-500'
                 )}
               >
                 <Trash2 className="h-5 w-5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Ausgewähltes Polygon löschen</p>
+              {selectedFeatureId ? 
+                <p>Ausgewähltes Polygon löschen</p> : 
+                <p>Alle Polygone löschen</p>
+              }
             </TooltipContent>
           </Tooltip>
 
@@ -148,8 +135,8 @@ const DrawingToolbar: React.FC = () => {
         </TooltipProvider>
       </div>
 
-      {/* Messungsergebnisse */}
-      {(drawMode === 'measure' || selectedFeatureId) && measurementResults && (
+      {/* Messungsergebnisse - jetzt immer sichtbar, wenn ein Polygon ausgewählt ist oder gezeichnet wird */}
+      {(selectedFeatureId || drawMode === 'draw') && measurementResults && (
         <div className="bg-white p-3 rounded-md border border-border shadow-sm">
           <h3 className="font-medium text-sm mb-2 text-dach-primary">Messungsergebnisse:</h3>
           <div className="space-y-1">

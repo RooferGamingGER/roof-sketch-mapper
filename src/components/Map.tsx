@@ -409,8 +409,6 @@ const Map: React.FC = () => {
           createEditMarkersForPolygon(feature.geometry.coordinates[0] as Position[]);
         }
       }
-    } else if (drawMode === 'measure') {
-      setMessage('Wählen Sie ein Polygon aus, um dessen Maße anzuzeigen.');
     } else {
       setMessage('');
     }
@@ -543,6 +541,17 @@ const Map: React.FC = () => {
           type: 'Polygon',
           coordinates: [positionsToCoordinates([...tempPolygonCoords, tempPolygonCoords[0]])]
         }
+      });
+    }
+
+    // Show measurements during drawing
+    if (drawRef.current.currentPoints.length >= 3) {
+      const tempPolygonCoords = [...drawRef.current.currentPoints];
+      const { area, perimeter } = calculateMeasurements([...tempPolygonCoords, tempPolygonCoords[0]]);
+      
+      setMeasurementResults({
+        area,
+        perimeter
       });
     }
   };

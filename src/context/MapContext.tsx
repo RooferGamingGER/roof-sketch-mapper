@@ -3,7 +3,7 @@ import React, { createContext, useState, useContext, ReactNode } from 'react';
 import * as turf from '@turf/turf';
 import { MAPBOX_TOKEN } from '../config/mapbox';
 
-export type DrawMode = 'draw' | 'edit' | 'delete' | 'measure' | null;
+export type DrawMode = 'draw' | 'edit' | 'delete' | null;
 export type MapFeature = GeoJSON.Feature;
 
 interface MapContextType {
@@ -18,6 +18,7 @@ interface MapContextType {
   addFeature: (feature: MapFeature) => void;
   updateFeature: (id: string, feature: MapFeature) => void;
   deleteFeature: (id: string) => void;
+  deleteAllFeatures: () => void;
   selectedFeatureId: string | null;
   setSelectedFeatureId: (id: string | null) => void;
   measurementResults: {
@@ -55,7 +56,14 @@ export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setDrawnFeatures((prev) => prev.filter((f) => f.id !== id));
     if (selectedFeatureId === id) {
       setSelectedFeatureId(null);
+      setMeasurementResults({ area: null, perimeter: null });
     }
+  };
+  
+  const deleteAllFeatures = () => {
+    setDrawnFeatures([]);
+    setSelectedFeatureId(null);
+    setMeasurementResults({ area: null, perimeter: null });
   };
 
   return (
@@ -72,6 +80,7 @@ export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         addFeature,
         updateFeature,
         deleteFeature,
+        deleteAllFeatures,
         selectedFeatureId,
         setSelectedFeatureId,
         measurementResults,
