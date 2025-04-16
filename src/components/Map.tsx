@@ -94,6 +94,11 @@ const Map: React.FC = () => {
     const el = document.createElement('div');
     el.className = 'area-label';
     el.innerHTML = `<strong>${areaText} m²</strong>`;
+    el.style.backgroundColor = 'rgba(52, 152, 219, 0.8)';
+    el.style.color = 'white';
+    el.style.padding = '4px 8px';
+    el.style.borderRadius = '4px';
+    el.style.fontSize = '12px';
     return el;
   };
 
@@ -114,6 +119,18 @@ const Map: React.FC = () => {
         allLabelFeatures.push(...labels.features);
       }
     });
+    
+    if (drawMode === 'draw' && drawRef.current.currentPoints.length >= 2) {
+      const tempPolygonCoords = [...drawRef.current.currentPoints];
+      if (tempPolygonCoords.length >= 3) {
+        const tempClosedPolygon = [...tempPolygonCoords, tempPolygonCoords[0]];
+        const tempLabels = generateLengthLabels(tempClosedPolygon);
+        allLabelFeatures.push(...tempLabels.features);
+      } else {
+        const tempLineLabels = generateLengthLabels(tempPolygonCoords);
+        allLabelFeatures.push(...tempLineLabels.features);
+      }
+    }
     
     drawRef.current.lengthLabelsSource.setData({
       type: 'FeatureCollection',
@@ -325,7 +342,7 @@ const Map: React.FC = () => {
             },
             paint: {
               'line-color': '#e67e22',
-              'line-width': 2,
+              'line-width': 2.5,
               'line-dasharray': [2, 1]
             }
           });
@@ -344,9 +361,13 @@ const Map: React.FC = () => {
             id: 'current-polygon-outline',
             type: 'line',
             source: 'current-polygon',
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
             paint: {
               'line-color': '#e67e22',
-              'line-width': 2
+              'line-width': 2.5
             }
           });
 
@@ -377,6 +398,10 @@ const Map: React.FC = () => {
             id: 'saved-polygons-outline',
             type: 'line',
             source: 'saved-polygons',
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
             paint: {
               'line-color': [
                 'case',
@@ -384,7 +409,7 @@ const Map: React.FC = () => {
                 '#3498db',
                 '#1a365d'
               ],
-              'line-width': 2
+              'line-width': 2.5
             }
           });
           
@@ -452,17 +477,37 @@ const Map: React.FC = () => {
               }
               
               if (drawRef.current.currentLineSource && drawRef.current.currentPoints.length > 0) {
-                const movePoint = [e.lngLat.lng, e.lngLat.lat];
-                const tempPoints = [...drawRef.current.currentPoints, movePoint];
-                
-                drawRef.current.currentLineSource.setData({
-                  type: 'Feature',
-                  properties: {},
-                  geometry: {
-                    type: 'LineString',
-                    coordinates: positionsToCoordinates(tempPoints)
+                const movePoint = snapResult.snapped ? snapResult.position : [e.lngLat.lng, e.lngLat.lat];
+                if (movePoint) {
+                  const tempPoints = [...drawRef.current.currentPoints, movePoint];
+                  
+                  drawRef.current.currentLineSource.setData({
+                    type: 'Feature',
+                    properties: {},
+                    geometry: {
+                      type: 'LineString',
+                      coordinates: positionsToCoordinates(tempPoints)
+                    }
+                  });
+
+                  if (drawRef.current.currentPoints.length >= 3 && drawRef.current.currentPolygonSource) {
+                    const tempPolygonCoords = [...drawRef.current.currentPoints, movePoint];
+                    if (tempPolygonCoords.length >= 3) {
+                      drawRef.current.currentPolygonSource.setData({
+                        type: 'Feature',
+                        properties: {},
+                        geometry: {
+                          type: 'Polygon',
+                          coordinates: [positionsToCoordinates([...tempPolygonCoords, tempPolygonCoords[0]])]
+                        }
+                      });
+                    }
                   }
-                });
+                  
+                  if (drawRef.current.lengthLabelsSource) {
+                    updateAllPolygonLabels();
+                  }
+                }
               }
             }
           });
@@ -733,13 +778,10 @@ const Map: React.FC = () => {
           coordinates: [positionsToCoordinates([...tempPolygonCoords, tempPolygonCoords[0]])]
         }
       });
-      
-      if (drawRef.current.lengthLabelsSource) {
-        const closedPolygon = [...tempPolygonCoords, tempPolygonCoords[0]];
-        const labels = generateLengthLabels(closedPolygon);
-        
-        drawRef.current.lengthLabelsSource.setData(labels);
-      }
+    }
+    
+    if (drawRef.current.lengthLabelsSource && drawRef.current.currentPoints.length >= 2) {
+      updateAllPolygonLabels();
     }
 
     if (drawRef.current.currentPoints.length >= 3) {

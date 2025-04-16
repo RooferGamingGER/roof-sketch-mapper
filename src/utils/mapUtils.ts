@@ -49,25 +49,16 @@ export function getBearing(point1: Position | [number, number], point2: Position
   return turf.bearing(from, to);
 }
 
-// Generate GeoJSON for line segment labels - updated to work with the map style configuration
+// Generate GeoJSON for line segment labels - enhanced for clear visibility
 export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCollection {
   const features: GeoJSON.Feature[] = [];
   
   if (coordinates.length < 2) return { type: 'FeatureCollection', features };
   
-  // Ensure we have a closed polygon
-  const closedCoords = [...coordinates];
-  const first = coordinates[0];
-  const last = coordinates[coordinates.length - 1];
-  
-  if (first[0] !== last[0] || first[1] !== last[1]) {
-    closedCoords.push(first);
-  }
-  
   // Create a label for each segment
-  for (let i = 0; i < closedCoords.length - 1; i++) {
-    const start = closedCoords[i];
-    const end = closedCoords[i + 1];
+  for (let i = 0; i < coordinates.length - 1; i++) {
+    const start = coordinates[i];
+    const end = coordinates[i + 1];
     const distance = getDistance(start, end);
     
     // Skip labels for segments that are effectively 0 meters (points that are too close)
