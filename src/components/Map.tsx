@@ -210,8 +210,15 @@ const Map: React.FC = () => {
     map.current.getCanvas().style.cursor = '';
 
     if (drawMode === 'draw') {
-      map.current.on('click', (e) => handleMapClick(e, map.current!, drawMode, updateAllPolygonLabels, updateMeasurements));
-      map.current.on('contextmenu', (e) => handleRightClick(e, map.current!, drawMode));
+      // Fix: Wrap the event handlers to properly pass the required arguments
+      map.current.on('click', (e) => {
+        handleMapClick(e, map.current!, drawMode, updateAllPolygonLabels, updateMeasurements);
+      });
+      
+      map.current.on('contextmenu', (e) => {
+        handleRightClick(e, map.current!, drawMode);
+      });
+      
       map.current.getCanvas().style.cursor = 'crosshair';
       setMessage('Klicken Sie auf die Karte, um Punkte hinzuzufügen. Rechtsklick oder Klicken auf den ersten Punkt zum Abschließen.');
     } else if (drawMode === 'edit') {
