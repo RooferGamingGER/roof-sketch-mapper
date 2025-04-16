@@ -44,6 +44,7 @@ const RoofMapper: React.FC = () => {
                     <p className="text-sm text-muted-foreground">
                       Mit dieser App können Dachdecker Dächer auf einer Karte markieren und vermessen.
                       Zeichnen Sie Polygone, um Dachflächen zu markieren und deren Fläche und Umfang zu berechnen.
+                      Satellitenbilder werden vom Geoportal NRW bereitgestellt und sind nur für Nordrhein-Westfalen verfügbar.
                     </p>
                   </div>
                   

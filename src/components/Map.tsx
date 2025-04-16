@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -51,6 +52,14 @@ const Map: React.FC = () => {
   const [mapError, setMapError] = useState<string | null>(null);
   const [message, setMessage] = useState<string>('Karte wird geladen...');
   const [hoverPoint, setHoverPoint] = useState<mapboxgl.Point | null>(null);
+  
+  // Define NRW bounding box coordinates
+  const nrwBounds = {
+    north: 52.5314,
+    south: 50.3230,
+    east: 9.4623,
+    west: 5.8663
+  };
 
   const clearEditMarkers = () => {
     drawRef.current.editMarkers.forEach(marker => marker.remove());
@@ -153,12 +162,49 @@ const Map: React.FC = () => {
         setIsLoading(true);
         map.current = new mapboxgl.Map({
           container: mapContainer.current,
-          style: 'mapbox://styles/mapbox/satellite-streets-v12',
+          style: {
+            version: 8,
+            sources: {
+              'raster-tiles': {
+                type: 'raster',
+                tiles: [
+                  'https://www.wms.nrw.de/geobasis/wms_nw_dop?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap&FORMAT=image/png&TRANSPARENT=true&LAYERS=nw_dop_rgb&WIDTH=256&HEIGHT=256&CRS=EPSG:3857&STYLES=&BBOX={bbox-epsg-3857}'
+                ],
+                tileSize: 256,
+                attribution: '© Geobasis NRW 2023'
+              },
+              'osm': {
+                type: 'raster',
+                tiles: [
+                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+                ],
+                tileSize: 256,
+                attribution: '© OpenStreetMap contributors'
+              }
+            },
+            layers: [
+              {
+                id: 'simple-tiles',
+                type: 'raster',
+                source: 'osm',
+                minzoom: 0,
+                maxzoom: 15
+              },
+              {
+                id: 'satellite-tiles',
+                type: 'raster',
+                source: 'raster-tiles',
+                minzoom: 15,
+                maxzoom: 22
+              }
+            ]
+          },
           zoom: 18,
-          pitch: 45,
+          pitch: 0,
           bearing: 0,
           attributionControl: false,
-          center: [13.4050, 52.5200],
+          center: [7.4652, 51.5135], // Center of NRW
+          maxBounds: [[nrwBounds.west, nrwBounds.south], [nrwBounds.east, nrwBounds.north]]
         });
 
         map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
@@ -343,6 +389,29 @@ const Map: React.FC = () => {
           setIsLoading(false);
           setMessage('Karte geladen. Sie können nun mit dem Zeichnen beginnen.');
           clearTimeout(loadTimeout);
+          
+          // Add warning for non-NRW areas
+          map.current.on('moveend', () => {
+            const center = map.current?.getCenter();
+            const zoom = map.current?.getZoom() || 0;
+            
+            if (center && (
+              center.lat < nrwBounds.south || 
+              center.lat > nrwBounds.north || 
+              center.lng < nrwBounds.west || 
+              center.lng > nrwBounds.east
+            )) {
+              toast.warning('Sie haben den Bereich von Nordrhein-Westfalen verlassen. Satellitenbilder sind nur für NRW verfügbar.');
+            }
+            
+            if (zoom < 15) {
+              setMessage('Bitte zoomen Sie näher heran, um die Satellitenbilder zu sehen.');
+            } else {
+              setMessage('');
+            }
+            
+            updateMeasurements();
+          });
         });
 
         map.current.on('error', (e) => {
@@ -350,10 +419,6 @@ const Map: React.FC = () => {
           setMapError('Fehler beim Laden der Karte: ' + (e.error?.message || 'Unbekannter Fehler'));
           setIsLoading(false);
           clearTimeout(loadTimeout);
-        });
-
-        map.current.on('move', () => {
-          updateMeasurements();
         });
       }
     } catch (error) {
@@ -604,7 +669,7 @@ const Map: React.FC = () => {
       <div ref={mapContainer} className="w-full h-full min-h-[400px]" />
       
       <div className="absolute bottom-0 right-0 z-10 text-xs text-white bg-black/50 px-2 py-1">
-        © Mapbox
+        © Geobasis NRW 2023
       </div>
     </div>
   );
