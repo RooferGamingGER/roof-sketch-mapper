@@ -1,168 +1,98 @@
+// src/components/DrawTools.tsx
+import { useEffect } from "react";
+import L from "leaflet";
+import "leaflet-draw";
+import "leaflet-geometryutil";
 
-import React from 'react';
-import { Button } from '@/components/ui/button';
-import { 
-  Pencil,
-  Edit,
-  Trash2,
-  X,
-} from 'lucide-react';
-import { useMapContext, DrawMode } from '@/context/MapContext';
-import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
-import { 
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger 
-} from "@/components/ui/tooltip";
+interface DrawToolsProps {
+  map: L.Map | null;
+}
 
-const DrawingToolbar: React.FC = () => {
-  const { 
-    drawMode, 
-    setDrawMode, 
-    selectedFeatureId, 
-    deleteFeature,
-    deleteAllFeatures,
-    drawnFeatures,
-    measurementResults
-  } = useMapContext();
-
-  // Funktion zum Setzen des Zeichenmodus
-  const setMode = (mode: DrawMode) => {
-    if (drawMode === mode) {
-      setDrawMode(null);
-    } else {
-      setDrawMode(mode);
+export const DrawTools = ({ map }: DrawToolsProps) => {
+  useEffect(() => {
+    if (!map) {
+      console.warn("🛑 DrawTools skipped: map is null");
+      return;
     }
-  };
 
-  // Funktion zum Löschen des ausgewählten Polygons oder aller Polygone
-  const handleDelete = () => {
-    if (selectedFeatureId) {
-      deleteFeature(selectedFeatureId);
-      toast.success('Polygon wurde gelöscht');
-    } else if (drawnFeatures.length > 0) {
-      // Force UI update by checking after the delete function completes
-      const featureCount = drawnFeatures.length;
-      deleteAllFeatures();
-      toast.success(`${featureCount} Polygon${featureCount !== 1 ? 'e' : ''} wurden gelöscht`);
-    } else {
-      toast.error('Keine Polygone zum Löschen vorhanden');
-    }
-  };
+    const tryEnableDrawTools = () => {
+      if (!map._controlCorners) {
+        console.warn("⏳ map._controlCorners not ready, retrying...");
+        setTimeout(tryEnableDrawTools, 200);
+        return;
+      }
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2">
-        <TooltipProvider>
-          {/* Zeichnen-Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={drawMode === 'draw' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setMode('draw')}
-                className={cn(
-                  drawMode === 'draw' && 'bg-dach-secondary hover:bg-dach-secondary/90 text-white'
-                )}
-              >
-                <Pencil className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Polygon zeichnen</p>
-            </TooltipContent>
-          </Tooltip>
+      console.log("✅ Enabling DrawTools");
 
-          {/* Bearbeiten-Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={drawMode === 'edit' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setMode('edit')}
-                disabled={!selectedFeatureId}
-                className={cn(
-                  drawMode === 'edit' && 'bg-amber-500 hover:bg-amber-500/90 text-white'
-                )}
-              >
-                <Edit className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Polygon bearbeiten</p>
-            </TooltipContent>
-          </Tooltip>
+      const drawnItems = new L.FeatureGroup();
+      map.addLayer(drawnItems);
 
-          {/* Löschen-Button - jetzt für einzelne oder alle Polygone */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleDelete}
-                disabled={drawnFeatures.length === 0}
-                className={cn(
-                  'hover:bg-red-100 hover:text-red-500'
-                )}
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {selectedFeatureId ? 
-                <p>Ausgewähltes Polygon löschen</p> : 
-                <p>Alle Polygone löschen</p>
-              }
-            </TooltipContent>
-          </Tooltip>
+      const drawControl = new L.Control.Draw({
+        position: "topright",
+        draw: {
+          polygon: {
+            allowIntersection: false,
+            showArea: true,
+            shapeOptions: {
+              color: "#f97316", // tailwind orange-500
+              weight: 3,
+            },
+            title: "Dachfläche messen",
+          },
+          marker: false,
+          polyline: false,
+          rectangle: false,
+          circle: false,
+          circlemarker: false,
+        },
+        edit: {
+          featureGroup: drawnItems,
+          remove: true,
+        },
+      });
 
-          {/* Alles abbrechen-Button */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setDrawMode(null)}
-                disabled={!drawMode}
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Abbrechen</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      </div>
+      try {
+        map.addControl(drawControl);
+        console.log("✅ Draw control added");
+      } catch (error) {
+        console.error("❌ Failed to add drawControl:", error);
+      }
 
-      {/* Messungsergebnisse - jetzt immer sichtbar, wenn ein Polygon ausgewählt ist oder gezeichnet wird */}
-      {(selectedFeatureId || drawMode === 'draw') && measurementResults && (
-        <div className="bg-white p-3 rounded-md border border-border shadow-sm">
-          <h3 className="font-medium text-sm mb-2 text-dach-primary">Messungsergebnisse:</h3>
-          <div className="space-y-1">
-            <p className="text-sm flex justify-between">
-              <span>Fläche:</span> 
-              <span className="font-medium">
-                {measurementResults.area 
-                  ? `${(measurementResults.area).toFixed(2)} m²` 
-                  : '-'}
-              </span>
-            </p>
-            <p className="text-sm flex justify-between">
-              <span>Umfang:</span> 
-              <span className="font-medium">
-                {measurementResults.perimeter 
-                  ? `${measurementResults.perimeter.toFixed(2)} m` 
-                  : '-'}
-              </span>
-            </p>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+      map.on(L.Draw.Event.CREATED, (e: L.DrawEvents.Created) => {
+        const layer = e.layer;
+        drawnItems.addLayer(layer);
+
+        if ("getLatLngs" in layer) {
+          const latlngs = (layer as L.Polygon).getLatLngs()[0] as L.LatLng[];
+          const area = L.GeometryUtil.geodesicArea(latlngs);
+          const readable = `${(area / 1_000_000).toLocaleString("de-DE", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })} m²`;
+
+          const center = (layer as L.Polygon).getBounds().getCenter();
+          const label = L.marker(center, {
+            icon: L.divIcon({
+              className: "area-label",
+              html: `<strong>${readable}</strong>`,
+            }),
+          });
+
+          map.addLayer(label);
+        }
+      });
+
+      // Cleanup
+      return () => {
+        console.log("🧹 Cleaning up DrawTools");
+        map.removeLayer(drawnItems);
+        map.removeControl(drawControl);
+      };
+    };
+
+    // Call once map is fully ready
+    setTimeout(tryEnableDrawTools, 100);
+  }, [map]);
+
+  return null;
 };
-
-export default DrawingToolbar;
