@@ -28,7 +28,7 @@ const DrawingToolbar: React.FC = () => {
     measurementResults
   } = useMapContext();
 
-  // Funktion zum Setzen des Zeichenmodus
+  // Function to set the drawing mode
   const setMode = (mode: DrawMode) => {
     if (drawMode === mode) {
       setDrawMode(null);
@@ -37,7 +37,7 @@ const DrawingToolbar: React.FC = () => {
     }
   };
 
-  // Funktion zum Löschen des ausgewählten Polygons oder aller Polygone
+  // Function to delete the selected polygon or all polygons
   const handleDelete = () => {
     if (selectedFeatureId) {
       deleteFeature(selectedFeatureId);
@@ -56,7 +56,7 @@ const DrawingToolbar: React.FC = () => {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
         <TooltipProvider>
-          {/* Zeichnen-Button */}
+          {/* Draw Button */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -75,7 +75,7 @@ const DrawingToolbar: React.FC = () => {
             </TooltipContent>
           </Tooltip>
 
-          {/* Bearbeiten-Button */}
+          {/* Edit Button */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -95,7 +95,7 @@ const DrawingToolbar: React.FC = () => {
             </TooltipContent>
           </Tooltip>
 
-          {/* Löschen-Button - jetzt für einzelne oder alle Polygone */}
+          {/* Delete Button - for single or all polygons */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -118,7 +118,7 @@ const DrawingToolbar: React.FC = () => {
             </TooltipContent>
           </Tooltip>
 
-          {/* Alles abbrechen-Button */}
+          {/* Cancel Button */}
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -137,7 +137,7 @@ const DrawingToolbar: React.FC = () => {
         </TooltipProvider>
       </div>
 
-      {/* Messungsergebnisse - jetzt immer sichtbar, wenn ein Polygon ausgewählt ist oder gezeichnet wird */}
+      {/* Measurement Results - visible when a polygon is selected or being drawn */}
       {(selectedFeatureId || drawMode === 'draw') && measurementResults && (
         <div className="bg-white p-3 rounded-md border border-border shadow-sm">
           <h3 className="font-medium text-sm mb-2 text-dach-primary">Messungsergebnisse:</h3>
