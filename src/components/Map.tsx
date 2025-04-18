@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -935,4 +936,15 @@ const Map: React.FC = () => {
         </div>
       )}
 
-      {message && !isLoading
+      {message && !isLoading && (
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-background/90 text-foreground p-3 rounded-md shadow-md text-sm z-10">
+          {message}
+        </div>
+      )}
+      
+      <div ref={mapContainer} className="w-full h-full" />
+    </div>
+  );
+};
+
+export default Map;
