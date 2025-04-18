@@ -232,6 +232,11 @@ const Map: React.FC = () => {
     handleRightClick(e);
   };
 
+  const updateMeasurements = () => {
+    updateAllPolygonLabels();
+    updateAllAreaLabels();
+  };
+
   useEffect(() => {
     if (!mapContainer.current) return;
     
@@ -320,7 +325,6 @@ const Map: React.FC = () => {
         map.current.addControl(new mapboxgl.ScaleControl(), 'bottom-right');
 
         map.current.on('load', () => {
-          // Set up sources for current line and polygon
           map.current?.addSource('current-line', {
             type: 'geojson',
             data: {
@@ -345,7 +349,6 @@ const Map: React.FC = () => {
             }
           });
           
-          // Add source for permanent length labels
           map.current?.addSource('length-labels', {
             type: 'geojson',
             data: {
@@ -354,7 +357,6 @@ const Map: React.FC = () => {
             }
           });
           
-          // Add source for temporary length labels (during drawing)
           map.current?.addSource('temp-labels', {
             type: 'geojson',
             data: {
@@ -363,7 +365,6 @@ const Map: React.FC = () => {
             }
           });
 
-          // Add layers with improved styling for visibility
           map.current?.addLayer({
             id: 'current-line-layer',
             type: 'line',
@@ -379,7 +380,6 @@ const Map: React.FC = () => {
             }
           });
 
-          // Update current polygon preview style
           map.current?.addLayer({
             id: 'current-polygon-layer',
             type: 'fill',
@@ -413,7 +413,6 @@ const Map: React.FC = () => {
             }
           });
 
-          // Update the polygon styling for better visibility
           map.current?.addLayer({
             id: 'saved-polygons-layer',
             type: 'fill',
@@ -425,12 +424,11 @@ const Map: React.FC = () => {
                 '#3498db',
                 '#1a365d'
               ],
-              'fill-opacity': 0.2,  // Reduced opacity for better visibility of satellite imagery
-              'fill-outline-color': '#ffffff'  // White outline for contrast
+              'fill-opacity': 0.2,
+              'fill-outline-color': '#ffffff'
             }
           });
 
-          // Enhanced outline layer for saved polygons
           map.current?.addLayer({
             id: 'saved-polygons-outline',
             type: 'line',
@@ -446,12 +444,11 @@ const Map: React.FC = () => {
                 '#3498db',
                 '#ffffff'
               ],
-              'line-width': 4,  // Thicker lines
+              'line-width': 4,
               'line-opacity': 0.9
             }
           });
 
-          // Additional glow effect for better visibility
           map.current?.addLayer({
             id: 'saved-polygons-glow',
             type: 'line',
@@ -466,9 +463,8 @@ const Map: React.FC = () => {
               'line-opacity': 0.3,
               'line-blur': 3
             }
-          }, 'saved-polygons-outline');  // Insert below the outline layer
-          
-          // Layer for permanent length labels with improved visibility
+          }, 'saved-polygons-outline');
+
           map.current?.addLayer({
             id: 'length-labels',
             type: 'symbol',
@@ -492,8 +488,7 @@ const Map: React.FC = () => {
               'text-font': ['Open Sans Regular']
             }
           });
-          
-          // Layer for temporary length labels during drawing
+
           map.current?.addLayer({
             id: 'temp-labels',
             type: 'symbol',
@@ -545,7 +540,6 @@ const Map: React.FC = () => {
             setHoverPoint(e.point);
             
             if (drawMode === 'draw' && drawRef.current.currentPoints.length > 0) {
-              // Store the current mouse position for temporary labels
               drawRef.current.lastMousePosition = [e.lngLat.lng, e.lngLat.lat];
               
               const snapResult = checkSnapToVertex(
@@ -567,7 +561,6 @@ const Map: React.FC = () => {
                 if (movePoint) {
                   const tempPoints = [...drawRef.current.currentPoints, movePoint];
                   
-                  // Update the current line as you draw
                   drawRef.current.currentLineSource.setData({
                     type: 'Feature',
                     properties: {},
@@ -577,7 +570,6 @@ const Map: React.FC = () => {
                     }
                   });
 
-                  // Only show polygon preview if we have at least 3 points
                   if (drawRef.current.currentPoints.length >= 2 && drawRef.current.currentPolygonSource) {
                     const tempPolygonCoords = [...drawRef.current.currentPoints, movePoint];
                     drawRef.current.currentPolygonSource.setData({
@@ -590,7 +582,6 @@ const Map: React.FC = () => {
                     });
                   }
                   
-                  // Update labels during drawing
                   if (drawRef.current.tempLabelsSource) {
                     const tempLabels = generateTempLengthLabels(
                       drawRef.current.currentPoints,
@@ -726,12 +717,10 @@ const Map: React.FC = () => {
 
     const source = map.current.getSource('saved-polygons') as mapboxgl.GeoJSONSource;
     if (source) {
-      // Fix: Explicitly type the feature collection with literal type "FeatureCollection"
       const featureCollection: GeoJSON.FeatureCollection = {
-        type: "FeatureCollection", // Use literal string type
+        type: "FeatureCollection",
         features: drawnFeatures.map(feature => ({
           ...feature,
-          // Ensure that the ID is always present as a property
           properties: {
             ...(feature.properties || {}),
             id: feature.id
@@ -741,7 +730,6 @@ const Map: React.FC = () => {
       
       source.setData(featureCollection);
 
-      // Ensure measurements are always visible
       updateAllPolygonLabels();
       updateAllAreaLabels();
       
@@ -778,7 +766,6 @@ const Map: React.FC = () => {
   };
 
   const checkSnapToFirst = (point: mapboxgl.Point): Position | null => {
-    // Only allow snapping to first point if we have at least 3 points
     if (drawRef.current.currentPoints.length < 3) return null;
 
     const firstPoint = drawRef.current.currentPoints[0];
@@ -797,17 +784,14 @@ const Map: React.FC = () => {
   };
 
   const completePolygon = () => {
-    // Ensure we have at least 3 points for a valid polygon
     if (drawRef.current.currentPoints.length < 3) {
       toast.error('Ein Polygon benötigt mindestens 3 Punkte');
       return false;
     }
 
     const firstPoint = drawRef.current.currentPoints[0];
-    // Create a closed polygon by adding the first point again at the end
     const polygonCoords = [...drawRef.current.currentPoints, firstPoint];
     
-    // Wichtig: Stelle ein korrektes GeoJSON-Feature her
     const polygonFeature = {
       type: 'Feature',
       id: `polygon-${Date.now()}`,
@@ -820,7 +804,6 @@ const Map: React.FC = () => {
     
     const { area, perimeter } = calculateMeasurements(polygonCoords);
     
-    // Add area and perimeter to polygon properties
     polygonFeature.properties = {
       id: polygonFeature.id,
       area,
@@ -836,12 +819,10 @@ const Map: React.FC = () => {
       perimeter
     });
     
-    // Remove the temporary drawing markers but keep the polygon and measurements visible
     drawRef.current.currentMarkers.forEach(marker => marker.remove());
     drawRef.current.currentMarkers = [];
     drawRef.current.currentPoints = [];
 
-    // Clear the temporary drawing line but keep the measurement labels
     if (drawRef.current.currentLineSource) {
       drawRef.current.currentLineSource.setData({
         type: 'Feature',
@@ -864,7 +845,6 @@ const Map: React.FC = () => {
       });
     }
     
-    // Update all labels including the newly completed polygon
     updateAllPolygonLabels();
     updateAllAreaLabels();
     
@@ -878,10 +858,8 @@ const Map: React.FC = () => {
       return;
     }
     
-    // Prevent default context menu
     e.preventDefault();
     
-    // Only complete polygon if we have at least 3 points
     if (drawRef.current.currentPoints.length >= 3) {
       completePolygon();
     } else {
@@ -895,7 +873,6 @@ const Map: React.FC = () => {
     const point = e.point;
     let coords: Position;
     
-    // Check if we're clicking on the first point to close the polygon
     const snapPoint = checkSnapToFirst(point);
     if (snapPoint && drawRef.current.currentPoints.length >= 3) {
       coords = snapPoint;
@@ -905,10 +882,8 @@ const Map: React.FC = () => {
       coords = [e.lngLat.lng, e.lngLat.lat];
     }
 
-    // Add the new point
     drawRef.current.currentPoints.push(coords);
 
-    // Create a marker for the clicked point
     const marker = new mapboxgl.Marker({ 
       color: '#e67e22', 
       scale: 0.7,
@@ -918,7 +893,6 @@ const Map: React.FC = () => {
       .addTo(map.current);
     drawRef.current.currentMarkers.push(marker);
 
-    // Update the line being drawn
     if (drawRef.current.currentLineSource) {
       drawRef.current.currentLineSource.setData({
         type: 'Feature',
@@ -930,7 +904,6 @@ const Map: React.FC = () => {
       });
     }
 
-    // Only show polygon preview if we have at least 3 points
     if (drawRef.current.currentPoints.length >= 3 && drawRef.current.currentPolygonSource) {
       const tempPolygonCoords = [...drawRef.current.currentPoints];
       drawRef.current.currentPolygonSource.setData({
@@ -943,6 +916,42 @@ const Map: React.FC = () => {
       });
     }
     
-    // Update length labels for the drawn line segments
     if (drawRef.current.lengthLabelsSource && drawRef.current.currentPoints.length >= 2) {
-      updateAll
+      updateAllPolygonLabels();
+    }
+  };
+
+  return (
+    <div className="relative h-full w-full">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 z-10">
+          <div className="flex flex-col items-center gap-3 text-white">
+            <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-white"></div>
+            <span>Karte wird geladen...</span>
+          </div>
+        </div>
+      )}
+      
+      {mapError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-red-500 bg-opacity-20 z-10">
+          <div className="bg-white p-4 rounded-md shadow-lg max-w-md">
+            <h3 className="text-lg font-medium text-red-600">Fehler</h3>
+            <p className="mt-2 text-gray-700">{mapError}</p>
+          </div>
+        </div>
+      )}
+
+      {message && (
+        <div className="absolute top-3 left-3 right-3 z-10">
+          <div className="bg-white p-3 rounded-md shadow-lg border border-border">
+            <p className="text-sm">{message}</p>
+          </div>
+        </div>
+      )}
+
+      <div ref={mapContainer} className="h-full w-full"></div>
+    </div>
+  );
+};
+
+export default Map;
