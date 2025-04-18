@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -126,25 +125,19 @@ const Map: React.FC = () => {
       }
     });
     
-    // Only add labels for the current drawing if we're in draw mode
-    if (drawMode === 'draw' && drawRef.current.currentPoints.length >= 2) {
-      const labels = generateLengthLabels(drawRef.current.currentPoints);
-      allLabelFeatures.push(...labels.features);
-    }
-    
     // Update the labels source with all features
     drawRef.current.lengthLabelsSource.setData({
       type: 'FeatureCollection',
       features: allLabelFeatures
     });
     
-    // Update temporary label if we have a mouse position
-    if (drawRef.current.tempLabelsSource && drawRef.current.lastMousePosition && drawRef.current.currentPoints.length > 0) {
+    // Only show temporary labels during active drawing
+    if (drawMode === 'draw' && drawRef.current.tempLabelsSource && 
+        drawRef.current.lastMousePosition && drawRef.current.currentPoints.length > 0) {
       const tempLabels = generateTempLengthLabels(
         drawRef.current.currentPoints,
         drawRef.current.lastMousePosition
       );
-      
       drawRef.current.tempLabelsSource.setData(tempLabels);
     }
   };
@@ -225,7 +218,6 @@ const Map: React.FC = () => {
     });
   };
 
-  // Define wrapper functions here before they are used
   const handleMapClickWrapper = (e: mapboxgl.MapMouseEvent) => {
     handleMapClick(e);
   };
@@ -708,10 +700,11 @@ const Map: React.FC = () => {
         type: 'FeatureCollection',
         features: drawnFeatures
       });
+
+      // Ensure measurements are always visible
+      updateAllPolygonLabels();
+      updateAllAreaLabels();
     }
-    
-    updateAllPolygonLabels();
-    updateAllAreaLabels();
   }, [drawnFeatures, selectedFeatureId]);
 
   const resetCurrentDraw = () => {
@@ -799,16 +792,43 @@ const Map: React.FC = () => {
       perimeter
     });
     
-    // Update all labels
+    // Remove the temporary drawing markers but keep the polygon and measurements visible
+    drawRef.current.currentMarkers.forEach(marker => marker.remove());
+    drawRef.current.currentMarkers = [];
+    drawRef.current.currentPoints = [];
+
+    // Clear the temporary drawing line but keep the measurement labels
+    if (drawRef.current.currentLineSource) {
+      drawRef.current.currentLineSource.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'LineString',
+          coordinates: []
+        }
+      });
+    }
+
+    if (drawRef.current.currentPolygonSource) {
+      drawRef.current.currentPolygonSource.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[]]
+        }
+      });
+    }
+    
+    // Update all labels including the newly completed polygon
     updateAllPolygonLabels();
     updateAllAreaLabels();
     
     toast.success(`Polygon erstellt: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
     
-    resetCurrentDraw();
     return true;
   };
-  
+
   const handleRightClick = (e: mapboxgl.MapMouseEvent) => {
     if (!map.current || drawMode !== 'draw') {
       return;
