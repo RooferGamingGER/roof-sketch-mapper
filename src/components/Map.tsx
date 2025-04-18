@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -375,18 +374,19 @@ const Map: React.FC = () => {
             },
             paint: {
               'line-color': '#e67e22',
-              'line-width': 3,
-              'line-dasharray': [2, 1]
+              'line-width': 4,
+              'line-dasharray': [2, 2]
             }
           });
 
+          // Update current polygon preview style
           map.current?.addLayer({
             id: 'current-polygon-layer',
             type: 'fill',
             source: 'current-polygon',
             paint: {
               'fill-color': '#e67e22',
-              'fill-opacity': 0.3
+              'fill-opacity': 0.2
             }
           });
 
@@ -400,7 +400,8 @@ const Map: React.FC = () => {
             },
             paint: {
               'line-color': '#e67e22',
-              'line-width': 3
+              'line-width': 4,
+              'line-opacity': 0.9
             }
           });
 
@@ -412,7 +413,7 @@ const Map: React.FC = () => {
             }
           });
 
-          // First add the fill layer (lower z-index)
+          // Update the polygon styling for better visibility
           map.current?.addLayer({
             id: 'saved-polygons-layer',
             type: 'fill',
@@ -424,11 +425,12 @@ const Map: React.FC = () => {
                 '#3498db',
                 '#1a365d'
               ],
-              'fill-opacity': 0.3
+              'fill-opacity': 0.2,  // Reduced opacity for better visibility of satellite imagery
+              'fill-outline-color': '#ffffff'  // White outline for contrast
             }
           });
 
-          // Then add the outline layer on top (higher z-index)
+          // Enhanced outline layer for saved polygons
           map.current?.addLayer({
             id: 'saved-polygons-outline',
             type: 'line',
@@ -442,11 +444,29 @@ const Map: React.FC = () => {
                 'case',
                 ['boolean', ['==', ['get', 'id'], selectedFeatureId], false],
                 '#3498db',
-                '#1a365d'
+                '#ffffff'
               ],
-              'line-width': 3
+              'line-width': 4,  // Thicker lines
+              'line-opacity': 0.9
             }
           });
+
+          // Additional glow effect for better visibility
+          map.current?.addLayer({
+            id: 'saved-polygons-glow',
+            type: 'line',
+            source: 'saved-polygons',
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            paint: {
+              'line-color': '#000000',
+              'line-width': 6,
+              'line-opacity': 0.3,
+              'line-blur': 3
+            }
+          }, 'saved-polygons-outline');  // Insert below the outline layer
           
           // Layer for permanent length labels with improved visibility
           map.current?.addLayer({
@@ -455,12 +475,13 @@ const Map: React.FC = () => {
             source: 'length-labels',
             paint: {
               'text-color': '#ffffff',
-              'text-halo-color': '#3498db',
-              'text-halo-width': 3
+              'text-halo-color': '#000000',
+              'text-halo-width': 4,
+              'text-halo-blur': 1
             },
             layout: {
               'text-field': ['get', 'length'],
-              'text-size': 14,
+              'text-size': 16,
               'text-allow-overlap': true,
               'text-ignore-placement': true,
               'text-anchor': 'center',
@@ -924,70 +945,4 @@ const Map: React.FC = () => {
     
     // Update length labels for the drawn line segments
     if (drawRef.current.lengthLabelsSource && drawRef.current.currentPoints.length >= 2) {
-      updateAllPolygonLabels();
-    }
-
-    // Calculate and display measurements if we have enough points for a polygon
-    if (drawRef.current.currentPoints.length >= 3) {
-      const tempPolygonCoords = [...drawRef.current.currentPoints];
-      const { area, perimeter } = calculateMeasurements([...tempPolygonCoords, tempPolygonCoords[0]]);
-      
-      setMeasurementResults({
-        area,
-        perimeter
-      });
-    }
-  };
-
-  const updateMeasurements = () => {
-    if (drawnFeatures.length > 0) {
-      updateAllPolygonLabels();
-      updateAllAreaLabels();
-    }
-  };
-
-  return (
-    <div className="relative w-full h-full rounded-lg overflow-hidden border border-border">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-          <div className="flex flex-col items-center text-center">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-sm text-primary font-medium">Karte wird geladen...</p>
-          </div>
-        </div>
-      )}
-
-      {mapError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 p-6">
-          <div className="text-center max-w-md">
-            <p className="text-destructive font-medium">{mapError}</p>
-            <button 
-              className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 text-sm"
-              onClick={() => window.location.reload()}
-            >
-              Seite neu laden
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!isLoading && !coordinates && !mapError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10 p-6">
-          <div className="text-center max-w-md">
-            <p className="text-dach-primary font-medium">Bitte suchen Sie eine Adresse, um mit der Kartendarstellung zu beginnen.</p>
-          </div>
-        </div>
-      )}
-
-      {message && !isLoading && (
-        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-background/90 text-foreground p-3 rounded-md shadow-md text-sm z-10">
-          {message}
-        </div>
-      )}
-      
-      <div ref={mapContainer} className="w-full h-full" />
-    </div>
-  );
-};
-
-export default Map;
+      updateAll
