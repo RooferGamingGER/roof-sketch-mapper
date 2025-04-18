@@ -111,6 +111,11 @@ const Map: React.FC = () => {
     drawRef.current.areaLabels = [];
   };
 
+  const updateAll = () => {
+    updateAllPolygonLabels();
+    updateAllAreaLabels();
+  };
+
   const updateAllPolygonLabels = () => {
     if (!map.current || !drawRef.current.lengthLabelsSource) return;
     
@@ -914,6 +919,9 @@ const Map: React.FC = () => {
           coordinates: [positionsToCoordinates([...tempPolygonCoords, tempPolygonCoords[0]])]
         }
       });
+      
+      const { area, perimeter } = calculateMeasurements([...tempPolygonCoords, tempPolygonCoords[0]]);
+      setMeasurementResults({ area, perimeter });
     }
     
     if (drawRef.current.lengthLabelsSource && drawRef.current.currentPoints.length >= 2) {

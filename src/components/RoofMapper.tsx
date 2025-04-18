@@ -6,13 +6,8 @@ import AddressSearch from '@/components/AddressSearch';
 import DrawingToolbar from '@/components/DrawingToolbar';
 import { MapProvider } from '@/context/MapContext';
 import { Separator } from "@/components/ui/separator";
-import MeasurementsSidebar from '@/components/MeasurementsSidebar';
-import { useMeasurementSync } from '@/hooks/useMeasurementSync';
 
 const RoofMapper: React.FC = () => {
-  // Use the measurement sync hook to ensure measurements are updated
-  useMeasurementSync();
-  
   return (
     <MapProvider>
       <div className="flex flex-col gap-6">
@@ -24,10 +19,6 @@ const RoofMapper: React.FC = () => {
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <div className="lg:col-span-1 order-2 lg:order-1">
                   <DrawingToolbar />
-                  
-                  <div className="mt-6">
-                    <MeasurementsSidebar />
-                  </div>
                 </div>
                 
                 <div className="lg:col-span-3 h-[500px] order-1 lg:order-2">
