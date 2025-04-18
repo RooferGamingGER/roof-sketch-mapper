@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -132,7 +131,7 @@ const Map: React.FC = () => {
       allLabelFeatures.push(...labels.features);
     }
     
-    // Update the labels source
+    // Update the labels source with all features
     drawRef.current.lengthLabelsSource.setData({
       type: 'FeatureCollection',
       features: allLabelFeatures
@@ -424,7 +423,7 @@ const Map: React.FC = () => {
                 '#3498db',
                 '#1a365d'
               ],
-              'fill-opacity': 0.5
+              'fill-opacity': 0.3
             }
           });
 
@@ -452,21 +451,22 @@ const Map: React.FC = () => {
             id: 'length-labels',
             type: 'symbol',
             source: 'length-labels',
-            layout: {
-              'text-field': ['get', 'length'],
-              'text-size': 14,
-              'text-anchor': 'center',
-              'text-allow-overlap': true,
-              'text-letter-spacing': 0.05,
-              'text-font': ['Open Sans Regular'],
-              'text-padding': 3,
-              'text-rotate': ['get', 'bearing'],
-              'symbol-placement': 'point'
-            },
             paint: {
               'text-color': '#ffffff',
               'text-halo-color': '#3498db',
-              'text-halo-width': 2
+              'text-halo-width': 3
+            },
+            layout: {
+              'text-field': ['get', 'length'],
+              'text-size': 14,
+              'text-allow-overlap': true,
+              'text-ignore-placement': true,
+              'text-anchor': 'center',
+              'text-letter-spacing': 0.05,
+              'text-max-angle': 90,
+              'text-rotate': ['get', 'bearing'],
+              'symbol-placement': 'point',
+              'text-font': ['Open Sans Regular']
             }
           });
           
@@ -798,10 +798,9 @@ const Map: React.FC = () => {
       perimeter
     });
     
-    const polygonCenter = turf.center(polygonFeature).geometry.coordinates;
-    addAreaLabel(new mapboxgl.LngLat(polygonCenter[0], polygonCenter[1]), area);
-    
+    // Update all labels
     updateAllPolygonLabels();
+    updateAllAreaLabels();
     
     toast.success(`Polygon erstellt: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
     
@@ -936,19 +935,4 @@ const Map: React.FC = () => {
         </div>
       )}
 
-      {message && !isLoading && !mapError && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 px-4 py-2 bg-white/90 rounded-md shadow-md text-sm font-medium text-gray-800 pointer-events-none">
-          {message}
-        </div>
-      )}
-
-      <div ref={mapContainer} className="w-full h-full min-h-[400px]" />
-      
-      <div className="absolute bottom-0 right-0 z-10 text-xs text-white bg-black/50 px-2 py-1">
-        © Geobasis NRW 2023 | © Mapbox
-      </div>
-    </div>
-  );
-};
-
-export default Map;
+      {message && !isLoading

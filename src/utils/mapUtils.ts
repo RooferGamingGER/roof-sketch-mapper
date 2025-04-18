@@ -1,4 +1,3 @@
-
 import * as turf from '@turf/turf';
 import mapboxgl from 'mapbox-gl';
 import { Position } from 'geojson';
@@ -61,23 +60,51 @@ export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCo
     const end = coordinates[i + 1];
     const distance = getDistance(start, end);
     
-    // Skip labels for segments that are effectively 0 meters (points that are too close)
+    // Skip labels for segments that are effectively 0 meters
     if (distance < 0.1) continue;
     
     const midpoint = getMidpoint(start, end);
+    const bearing = getBearing(start, end);
     
     features.push({
       type: 'Feature',
       properties: {
         length: `${distance.toFixed(1)} m`,
         index: i,
-        bearing: getBearing(start, end) // Add bearing for label rotation
+        bearing: bearing
       },
       geometry: {
         type: 'Point',
         coordinates: midpoint
       }
     });
+  }
+  
+  // If it's a closed polygon, add label for the closing segment
+  if (coordinates.length > 2 && 
+      coordinates[0][0] === coordinates[coordinates.length - 1][0] && 
+      coordinates[0][1] === coordinates[coordinates.length - 1][1]) {
+    const start = coordinates[coordinates.length - 2];
+    const end = coordinates[0];
+    const distance = getDistance(start, end);
+    
+    if (distance >= 0.1) {
+      const midpoint = getMidpoint(start, end);
+      const bearing = getBearing(start, end);
+      
+      features.push({
+        type: 'Feature',
+        properties: {
+          length: `${distance.toFixed(1)} m`,
+          index: coordinates.length - 1,
+          bearing: bearing
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: midpoint
+        }
+      });
+    }
   }
   
   return {
@@ -97,7 +124,7 @@ export function generateTempLengthLabels(coordinates: Position[], movePoint: Pos
   const end = movePoint;
   const distance = getDistance(start, end);
   
-  // Skip labels for segments that are effectively 0 meters (points that are too close)
+  // Skip labels for segments that are effectively 0 meters
   if (distance < 0.1) return { type: 'FeatureCollection', features };
   
   const midpoint = getMidpoint(start, end);
