@@ -139,6 +139,12 @@ const Map: React.FC = () => {
         drawRef.current.lastMousePosition
       );
       drawRef.current.tempLabelsSource.setData(tempLabels);
+    } else if (drawRef.current.tempLabelsSource) {
+      // Clear temporary labels if not in draw mode
+      drawRef.current.tempLabelsSource.setData({
+        type: 'FeatureCollection',
+        features: []
+      });
     }
   };
 
@@ -405,6 +411,7 @@ const Map: React.FC = () => {
             }
           });
 
+          // First add the fill layer (lower z-index)
           map.current?.addLayer({
             id: 'saved-polygons-layer',
             type: 'fill',
@@ -420,6 +427,7 @@ const Map: React.FC = () => {
             }
           });
 
+          // Then add the outline layer on top (higher z-index)
           map.current?.addLayer({
             id: 'saved-polygons-outline',
             type: 'line',
@@ -696,14 +704,26 @@ const Map: React.FC = () => {
 
     const source = map.current.getSource('saved-polygons') as mapboxgl.GeoJSONSource;
     if (source) {
-      source.setData({
+      // Wichtig: Stelle sicher, dass die GeoJSON-Struktur korrekt ist
+      const featureCollection = {
         type: 'FeatureCollection',
-        features: drawnFeatures
-      });
+        features: drawnFeatures.map(feature => ({
+          ...feature,
+          // Stelle sicher, dass die ID immer als Eigenschaft vorhanden ist
+          properties: {
+            ...(feature.properties || {}),
+            id: feature.id
+          }
+        }))
+      };
+      
+      source.setData(featureCollection);
 
       // Ensure measurements are always visible
       updateAllPolygonLabels();
       updateAllAreaLabels();
+      
+      console.log('Updated polygon source with features:', featureCollection);
     }
   }, [drawnFeatures, selectedFeatureId]);
 
@@ -731,14 +751,6 @@ const Map: React.FC = () => {
           type: 'Polygon',
           coordinates: [[]]
         }
-      });
-    }
-    
-    // Clear temporary labels when resetting
-    if (drawRef.current.tempLabelsSource) {
-      drawRef.current.tempLabelsSource.setData({
-        type: 'FeatureCollection',
-        features: []
       });
     }
   };
@@ -772,8 +784,17 @@ const Map: React.FC = () => {
     const firstPoint = drawRef.current.currentPoints[0];
     // Create a closed polygon by adding the first point again at the end
     const polygonCoords = [...drawRef.current.currentPoints, firstPoint];
-    const polygonFeature = turf.polygon([positionsToCoordinates(polygonCoords)]);
-    polygonFeature.id = `polygon-${Date.now()}`;
+    
+    // Wichtig: Stelle ein korrektes GeoJSON-Feature her
+    const polygonFeature = {
+      type: 'Feature',
+      id: `polygon-${Date.now()}`,
+      properties: {},
+      geometry: {
+        type: 'Polygon',
+        coordinates: [positionsToCoordinates(polygonCoords)]
+      }
+    } as GeoJSON.Feature;
     
     const { area, perimeter } = calculateMeasurements(polygonCoords);
     
@@ -784,6 +805,7 @@ const Map: React.FC = () => {
       perimeter
     };
     
+    console.log('Adding new polygon feature:', polygonFeature);
     addFeature(polygonFeature);
     setSelectedFeatureId(polygonFeature.id as string);
     
