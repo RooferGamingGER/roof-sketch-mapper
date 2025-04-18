@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -704,12 +705,12 @@ const Map: React.FC = () => {
 
     const source = map.current.getSource('saved-polygons') as mapboxgl.GeoJSONSource;
     if (source) {
-      // Wichtig: Stelle sicher, dass die GeoJSON-Struktur korrekt ist
-      const featureCollection = {
-        type: 'FeatureCollection',
+      // Fix: Explicitly type the feature collection with literal type "FeatureCollection"
+      const featureCollection: GeoJSON.FeatureCollection = {
+        type: "FeatureCollection", // Use literal string type
         features: drawnFeatures.map(feature => ({
           ...feature,
-          // Stelle sicher, dass die ID immer als Eigenschaft vorhanden ist
+          // Ensure that the ID is always present as a property
           properties: {
             ...(feature.properties || {}),
             id: feature.id
