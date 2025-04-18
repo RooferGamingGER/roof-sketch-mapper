@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Index from '@/pages/Index';
 import NotFound from '@/pages/NotFound';
 import { MapProvider } from '@/context/MapProvider';
@@ -12,8 +12,6 @@ function App() {
     <MapProvider>
       <Routes>
         <Route path="/" element={<Index />} />
-        {/* Redirect /settings to the main page */}
-        <Route path="/settings" element={<Navigate to="/" />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </MapProvider>
@@ -21,3 +19,4 @@ function App() {
 }
 
 export default App;
+
