@@ -11,8 +11,8 @@ const RoofMapper: React.FC = () => {
   return (
     <MapProvider>
       <div className="flex flex-col gap-6">
-        <Card>
-          <CardContent className="pt-4">
+        <Card className="shadow-md">
+          <CardContent className="pt-6 pb-6">
             <div className="space-y-4">
               <AddressSearch />
               
@@ -21,12 +21,12 @@ const RoofMapper: React.FC = () => {
                   <DrawingToolbar />
                 </div>
                 
-                <div className="lg:col-span-3 h-[500px] order-1 lg:order-2">
+                <div className="lg:col-span-3 h-[500px] order-1 lg:order-2 relative border border-border rounded-md overflow-hidden">
                   <Map />
                 </div>
               </div>
               
-              <Separator className="my-4" />
+              <Separator className="my-6" />
               
               <div>
                 <h3 className="text-sm font-medium mb-2">Über diese App</h3>
@@ -40,7 +40,7 @@ const RoofMapper: React.FC = () => {
               <div>
                 <h3 className="text-sm font-medium mb-2">Version</h3>
                 <p className="text-sm text-muted-foreground">
-                  Dach-Sketch Mapper v1.0.0
+                  Dach-Sketch Mapper v1.0.1
                 </p>
               </div>
             </div>

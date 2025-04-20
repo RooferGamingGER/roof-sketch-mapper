@@ -121,7 +121,6 @@ const Map: React.FC = () => {
     
     const allLabelFeatures: GeoJSON.Feature[] = [];
     
-    // Add labels for all saved polygons
     drawnFeatures.forEach(feature => {
       if (feature.geometry.type === 'Polygon') {
         const coords = feature.geometry.coordinates[0];
@@ -130,13 +129,11 @@ const Map: React.FC = () => {
       }
     });
     
-    // Update the labels source with all features
     drawRef.current.lengthLabelsSource.setData({
       type: 'FeatureCollection',
       features: allLabelFeatures
     });
     
-    // Only show temporary labels during active drawing
     if (drawMode === 'draw' && drawRef.current.tempLabelsSource && 
         drawRef.current.lastMousePosition && drawRef.current.currentPoints.length > 0) {
       const tempLabels = generateTempLengthLabels(
@@ -145,7 +142,6 @@ const Map: React.FC = () => {
       );
       drawRef.current.tempLabelsSource.setData(tempLabels);
     } else if (drawRef.current.tempLabelsSource) {
-      // Clear temporary labels if not in draw mode
       drawRef.current.tempLabelsSource.setData({
         type: 'FeatureCollection',
         features: []
@@ -172,7 +168,6 @@ const Map: React.FC = () => {
     clearEditMarkers();
 
     coordinates.forEach((coord, index) => {
-      // Skip the last point if it's the same as the first (closing point)
       if (index === coordinates.length - 1 && 
           coordinates[0][0] === coord[0] && 
           coordinates[0][1] === coord[1]) {
@@ -195,7 +190,6 @@ const Map: React.FC = () => {
         const polygonCoords = [...feature.geometry.coordinates[0] as Position[]];
         polygonCoords[vertexIndex] = [newLngLat.lng, newLngLat.lat];
         
-        // If we're moving the first vertex, also update the closing vertex
         if (vertexIndex === 0) {
           polygonCoords[polygonCoords.length - 1] = [newLngLat.lng, newLngLat.lat];
         }
@@ -720,23 +714,32 @@ const Map: React.FC = () => {
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded()) return;
 
-    const source = map.current.getSource('saved-polygons') as mapboxgl.GeoJSONSource;
-    if (source) {
-      const featureCollection: GeoJSON.FeatureCollection = {
-        type: "FeatureCollection",
-        features: drawnFeatures.map(feature => ({
-          ...feature,
-          properties: {
-            ...(feature.properties || {}),
-            id: feature.id
-          }
-        }))
-      };
-      
-      source.setData(featureCollection);
-      
-      updateAllPolygonLabels();
-      updateAllAreaLabels();
+    try {
+      const source = map.current.getSource('saved-polygons') as mapboxgl.GeoJSONSource;
+      if (source) {
+        const featureCollection: GeoJSON.FeatureCollection = {
+          type: "FeatureCollection",
+          features: drawnFeatures.map(feature => ({
+            ...feature,
+            properties: {
+              ...(feature.properties || {}),
+              id: feature.id
+            }
+          }))
+        };
+        
+        source.setData(featureCollection);
+        
+        if (map.current && map.current.isStyleLoaded()) {
+          map.current.triggerRepaint();
+        }
+        
+        updateAllPolygonLabels();
+        updateAllAreaLabels();
+      }
+    } catch (error) {
+      console.error('Error updating polygon source:', error);
+      toast.error('Problem bei der Aktualisierung der Polygone');
     }
   }, [drawnFeatures, selectedFeatureId]);
 
@@ -766,6 +769,13 @@ const Map: React.FC = () => {
         }
       });
     }
+    
+    if (drawRef.current.tempLabelsSource) {
+      drawRef.current.tempLabelsSource.setData({
+        type: 'FeatureCollection',
+        features: []
+      });
+    }
   };
 
   const checkSnapToFirst = (point: mapboxgl.Point): Position | null => {
@@ -792,61 +802,69 @@ const Map: React.FC = () => {
       return false;
     }
 
-    const firstPoint = drawRef.current.currentPoints[0];
-    const polygonCoords = [...drawRef.current.currentPoints, firstPoint];
-    
-    const { area, perimeter } = calculateMeasurements(polygonCoords);
-    
-    const polygonFeature = {
-      type: 'Feature',
-      id: `polygon-${Date.now()}`,
-      properties: {
-        id: `polygon-${Date.now()}`,
-        area,
-        perimeter
-      },
-      geometry: {
-        type: 'Polygon',
-        coordinates: [positionsToCoordinates(polygonCoords)]
-      }
-    } as GeoJSON.Feature;
-    
-    addFeature(polygonFeature);
-    setSelectedFeatureId(polygonFeature.id as string);
-    setMeasurementResults({ area, perimeter });
-    
-    updateAllPolygonLabels();
-    updateAllAreaLabels();
-    
-    drawRef.current.currentMarkers.forEach(marker => marker.remove());
-    drawRef.current.currentMarkers = [];
-    drawRef.current.currentPoints = [];
-
-    if (drawRef.current.currentLineSource) {
-      drawRef.current.currentLineSource.setData({
+    try {
+      const firstPoint = drawRef.current.currentPoints[0];
+      const polygonCoords = [...drawRef.current.currentPoints, firstPoint];
+      
+      const { area, perimeter } = calculateMeasurements(polygonCoords);
+      
+      const polygonId = `polygon-${Date.now()}`;
+      const polygonFeature = {
         type: 'Feature',
-        properties: {},
-        geometry: {
-          type: 'LineString',
-          coordinates: []
-        }
-      });
-    }
-
-    if (drawRef.current.currentPolygonSource) {
-      drawRef.current.currentPolygonSource.setData({
-        type: 'Feature',
-        properties: {},
+        id: polygonId,
+        properties: {
+          id: polygonId,
+          area,
+          perimeter
+        },
         geometry: {
           type: 'Polygon',
-          coordinates: [[]]
+          coordinates: [positionsToCoordinates(polygonCoords)]
         }
-      });
+      } as GeoJSON.Feature;
+      
+      addFeature(polygonFeature);
+      
+      setSelectedFeatureId(polygonId);
+      setMeasurementResults({ area, perimeter });
+      
+      toast.success(`Polygon erstellt: ${area.toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
+      
+      drawRef.current.currentMarkers.forEach(marker => marker.remove());
+      drawRef.current.currentMarkers = [];
+      drawRef.current.currentPoints = [];
+      
+      if (drawRef.current.currentLineSource) {
+        drawRef.current.currentLineSource.setData({
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'LineString',
+            coordinates: []
+          }
+        });
+      }
+
+      if (drawRef.current.currentPolygonSource) {
+        drawRef.current.currentPolygonSource.setData({
+          type: 'Feature',
+          properties: {},
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[]]
+          }
+        });
+      }
+      
+      updateAllPolygonLabels();
+      updateAllAreaLabels();
+      
+      return true;
+    } catch (error) {
+      console.error('Error completing polygon:', error);
+      toast.error('Fehler beim Erstellen des Polygons');
+      return false;
     }
-    
-    toast.success(`Polygon erstellt: ${area.toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
-    
-    return true;
   };
 
   const handleRightClick = (e: mapboxgl.MapMouseEvent) => {

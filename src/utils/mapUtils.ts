@@ -81,29 +81,35 @@ export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCo
   }
   
   // If it's a closed polygon, add label for the closing segment
-  if (coordinates.length > 2 && 
-      coordinates[0][0] === coordinates[coordinates.length - 1][0] && 
-      coordinates[0][1] === coordinates[coordinates.length - 1][1]) {
-    const start = coordinates[coordinates.length - 2];
-    const end = coordinates[0];
-    const distance = getDistance(start, end);
+  if (coordinates.length > 2) {
+    // Check if the last coordinate is identical to the first (closed polygon)
+    const firstPoint = coordinates[0];
+    const lastPoint = coordinates[coordinates.length - 1];
+    const isClosedPolygon = firstPoint[0] === lastPoint[0] && firstPoint[1] === lastPoint[1];
     
-    if (distance >= 0.1) {
-      const midpoint = getMidpoint(start, end);
-      const bearing = getBearing(start, end);
+    if (isClosedPolygon) {
+      // The segment between the second-to-last and first point (skipping duplicate at the end)
+      const start = coordinates[coordinates.length - 2];
+      const end = coordinates[0];
+      const distance = getDistance(start, end);
       
-      features.push({
-        type: 'Feature',
-        properties: {
-          length: `${distance.toFixed(1)} m`,
-          index: coordinates.length - 1,
-          bearing: bearing
-        },
-        geometry: {
-          type: 'Point',
-          coordinates: midpoint
-        }
-      });
+      if (distance >= 0.1) {
+        const midpoint = getMidpoint(start, end);
+        const bearing = getBearing(start, end);
+        
+        features.push({
+          type: 'Feature',
+          properties: {
+            length: `${distance.toFixed(1)} m`,
+            index: coordinates.length - 1,
+            bearing: bearing
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: midpoint
+          }
+        });
+      }
     }
   }
   
