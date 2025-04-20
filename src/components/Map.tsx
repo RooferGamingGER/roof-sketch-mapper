@@ -734,11 +734,9 @@ const Map: React.FC = () => {
       };
       
       source.setData(featureCollection);
-
+      
       updateAllPolygonLabels();
       updateAllAreaLabels();
-      
-      console.log('Updated polygon source with features:', featureCollection);
     }
   }, [drawnFeatures, selectedFeatureId]);
 
@@ -797,32 +795,28 @@ const Map: React.FC = () => {
     const firstPoint = drawRef.current.currentPoints[0];
     const polygonCoords = [...drawRef.current.currentPoints, firstPoint];
     
+    const { area, perimeter } = calculateMeasurements(polygonCoords);
+    
     const polygonFeature = {
       type: 'Feature',
       id: `polygon-${Date.now()}`,
-      properties: {},
+      properties: {
+        id: `polygon-${Date.now()}`,
+        area,
+        perimeter
+      },
       geometry: {
         type: 'Polygon',
         coordinates: [positionsToCoordinates(polygonCoords)]
       }
     } as GeoJSON.Feature;
     
-    const { area, perimeter } = calculateMeasurements(polygonCoords);
-    
-    polygonFeature.properties = {
-      id: polygonFeature.id,
-      area,
-      perimeter
-    };
-    
-    console.log('Adding new polygon feature:', polygonFeature);
     addFeature(polygonFeature);
     setSelectedFeatureId(polygonFeature.id as string);
+    setMeasurementResults({ area, perimeter });
     
-    setMeasurementResults({
-      area,
-      perimeter
-    });
+    updateAllPolygonLabels();
+    updateAllAreaLabels();
     
     drawRef.current.currentMarkers.forEach(marker => marker.remove());
     drawRef.current.currentMarkers = [];
@@ -850,10 +844,7 @@ const Map: React.FC = () => {
       });
     }
     
-    updateAllPolygonLabels();
-    updateAllAreaLabels();
-    
-    toast.success(`Polygon erstellt: ${(area).toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
+    toast.success(`Polygon erstellt: ${area.toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
     
     return true;
   };
