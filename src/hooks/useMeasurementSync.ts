@@ -12,7 +12,6 @@ export const useMeasurementSync = () => {
     deleteMeasurement
   } = useMapContext();
 
-  // Sync measurements with drawn features
   useEffect(() => {
     const syncMeasurements = () => {
       try {
@@ -41,34 +40,17 @@ export const useMeasurementSync = () => {
             const coordinates = feature.geometry.coordinates[0];
             const { area, perimeter } = calculateMeasurements(coordinates);
             
-            // Store calculated values
-            let shouldUpdate = false;
-            
             if (currentMeasurementIds.has(id)) {
-              // Update existing measurement if values changed
+              // Update existing measurement
               const existingMeasurement = allMeasurements.find(m => m.id === id);
               if (existingMeasurement && 
-                  (existingMeasurement.area !== area || 
-                   existingMeasurement.perimeter !== perimeter)) {
+                  (Math.abs(existingMeasurement.area - area) > 0.01 || 
+                   Math.abs(existingMeasurement.perimeter - perimeter) > 0.01)) {
                 updateMeasurement(id, area, perimeter);
-                shouldUpdate = true;
               }
             } else {
               // Add new measurement
               addMeasurement(id, area, perimeter);
-              shouldUpdate = true;
-            }
-            
-            // Make sure the feature itself has the correct properties
-            if (shouldUpdate && (!feature.properties?.area || feature.properties?.area !== area || 
-                !feature.properties?.perimeter || feature.properties?.perimeter !== perimeter)) {
-              // Note: this doesn't trigger a render since we're not using the updateFeature function
-              // This just ensures the GeoJSON has the correct properties
-              feature.properties = {
-                ...feature.properties,
-                area,
-                perimeter
-              };
             }
           }
         });

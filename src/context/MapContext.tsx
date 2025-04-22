@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import * as turf from '@turf/turf';
 import { MAPBOX_TOKEN } from '../config/mapbox';
@@ -41,7 +40,6 @@ interface MapContextType {
 const MapContext = createContext<MapContextType | undefined>(undefined);
 
 export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // We're now using the constant token instead of state
   const mapboxToken = MAPBOX_TOKEN;
   
   const [drawMode, setDrawMode] = useState<DrawMode>(null);
@@ -77,19 +75,8 @@ export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSelectedFeatureId(null);
     setMeasurementResults({ area: null, perimeter: null });
     setAllMeasurements([]);
-    // Force redraw by setting draw mode to null
-    setDrawMode(prevMode => {
-      if (prevMode !== null) {
-        // If we were in a draw mode, temporarily set to null to force redraw
-        const currentMode = prevMode;
-        setTimeout(() => setDrawMode(currentMode), 50);
-        return null;
-      }
-      return prevMode;
-    });
   };
 
-  // Functions for managing measurements
   const addMeasurement = (id: string, area: number, perimeter: number) => {
     setAllMeasurements(prev => [...prev, { id, area, perimeter }]);
   };
