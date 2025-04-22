@@ -10,7 +10,8 @@ export const useMeasurementSync = () => {
     updateMeasurement, 
     allMeasurements,
     deleteMeasurement,
-    updateFeature
+    updateFeature,
+    selectedFeatureId
   } = useMapContext();
 
   useEffect(() => {
@@ -41,13 +42,16 @@ export const useMeasurementSync = () => {
             const coordinates = feature.geometry.coordinates[0];
             const { area, perimeter } = calculateMeasurements(coordinates);
             
+            // Force update if this is the selected feature to ensure UI sync
+            const shouldForceUpdate = id === selectedFeatureId;
+            
             // Check if measurement exists
             const existingMeasurementIndex = allMeasurements.findIndex(m => m.id === id);
             
             if (existingMeasurementIndex !== -1) {
-              // Update existing measurement with a very small tolerance (0.001)
               const existingMeasurement = allMeasurements[existingMeasurementIndex];
-              if (Math.abs(existingMeasurement.area - area) > 0.001 || 
+              if (shouldForceUpdate ||
+                  Math.abs(existingMeasurement.area - area) > 0.001 || 
                   Math.abs(existingMeasurement.perimeter - perimeter) > 0.001) {
                 updateMeasurement(id, area, perimeter);
               }
@@ -56,10 +60,11 @@ export const useMeasurementSync = () => {
               addMeasurement(id, area, perimeter);
             }
             
-            // Ensure feature properties are always up-to-date
+            // Always ensure feature properties are up-to-date
             if (!feature.properties || 
                 !feature.properties.area || 
                 !feature.properties.perimeter ||
+                shouldForceUpdate ||
                 Math.abs(feature.properties.area - area) > 0.001 || 
                 Math.abs(feature.properties.perimeter - perimeter) > 0.001) {
               
@@ -72,7 +77,6 @@ export const useMeasurementSync = () => {
                 }
               };
               
-              // Update the feature in the context to ensure properties are always current
               updateFeature(id, updatedFeature);
             }
           }
@@ -83,5 +87,5 @@ export const useMeasurementSync = () => {
     };
     
     syncMeasurements();
-  }, [drawnFeatures, addMeasurement, updateMeasurement, deleteMeasurement, allMeasurements, updateFeature]);
+  }, [drawnFeatures, addMeasurement, updateMeasurement, deleteMeasurement, allMeasurements, updateFeature, selectedFeatureId]);
 };

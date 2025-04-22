@@ -183,8 +183,49 @@ const Map: React.FC = () => {
       }
 
       const marker = new VertexMarker(coord, index);
-      
       marker.addTo(map.current!);
+      
+      marker.on('dragstart', () => {
+        if (drawRef.current.tempLabelsSource) {
+          drawRef.current.tempLabelsSource.setData({
+            type: 'FeatureCollection',
+            features: []
+          });
+        }
+      });
+      
+      marker.on('drag', () => {
+        if (!selectedFeatureId) return;
+        
+        const newLngLat = marker.getLngLat();
+        const vertexIndex = marker.getVertexIndex();
+        
+        const feature = drawnFeatures.find(f => f.id === selectedFeatureId);
+        if (!feature || feature.geometry.type !== 'Polygon') return;
+        
+        const polygonCoords = [...feature.geometry.coordinates[0] as Position[]];
+        polygonCoords[vertexIndex] = [newLngLat.lng, newLngLat.lat];
+        
+        if (vertexIndex === 0) {
+          polygonCoords[polygonCoords.length - 1] = [newLngLat.lng, newLngLat.lat];
+        }
+        
+        if (drawRef.current.currentPolygonSource) {
+          drawRef.current.currentPolygonSource.setData({
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'Polygon',
+              coordinates: [polygonCoords]
+            }
+          });
+        }
+
+        if (drawRef.current.lengthLabelsSource) {
+          const labels = generateLengthLabels(polygonCoords);
+          drawRef.current.lengthLabelsSource.setData(labels);
+        }
+      });
       
       marker.on('dragend', () => {
         if (!selectedFeatureId) return;
@@ -202,24 +243,28 @@ const Map: React.FC = () => {
           polygonCoords[polygonCoords.length - 1] = [newLngLat.lng, newLngLat.lat];
         }
 
+        const { area, perimeter } = calculateMeasurements(polygonCoords);
+        
         const updatedFeature = {
           ...feature,
           geometry: {
             ...feature.geometry,
             coordinates: [polygonCoords]
+          },
+          properties: {
+            ...feature.properties,
+            area,
+            perimeter
           }
         };
         
-        const { area, perimeter } = calculateMeasurements(polygonCoords);
-        updatedFeature.properties = {
-          ...updatedFeature.properties,
-          area,
-          perimeter
-        };
-        
         updateFeature(selectedFeatureId, updatedFeature);
-        
         setMeasurementResults({ area, perimeter });
+        
+        if (drawRef.current.lengthLabelsSource) {
+          const labels = generateLengthLabels(polygonCoords);
+          drawRef.current.lengthLabelsSource.setData(labels);
+        }
         
         updateAllPolygonLabels();
         updateAllAreaLabels();
@@ -471,11 +516,12 @@ const Map: React.FC = () => {
               'text-color': '#ffffff',
               'text-halo-color': '#000000',
               'text-halo-width': 4,
-              'text-halo-blur': 1
+              'text-halo-blur': 1,
+              'text-opacity': 1
             },
             layout: {
               'text-field': ['get', 'length'],
-              'text-size': 16,
+              'text-size': 14,
               'text-allow-overlap': true,
               'text-ignore-placement': true,
               'text-anchor': 'center',
@@ -483,7 +529,8 @@ const Map: React.FC = () => {
               'text-max-angle': 90,
               'text-rotate': ['get', 'bearing'],
               'symbol-placement': 'point',
-              'text-font': ['Open Sans Regular']
+              'text-font': ['Open Sans Regular'],
+              'visibility': 'visible'
             }
           }, 'saved-polygons-layer');
 

@@ -34,11 +34,13 @@ const MeasurementsSidebar = () => {
             {allMeasurements.map((measurement, index) => (
               <TableRow 
                 key={measurement.id}
-                className={selectedFeatureId === measurement.id ? "bg-blue-50" : ""}
+                className={`cursor-pointer hover:bg-blue-50 ${
+                  selectedFeatureId === measurement.id ? "bg-blue-100" : ""
+                }`}
                 onClick={() => setSelectedFeatureId(measurement.id)}
               >
                 <TableCell className="font-medium">
-                  <div className="flex items-center gap-1 cursor-pointer">
+                  <div className="flex items-center gap-1">
                     <MapPin className="h-3.5 w-3.5" />
                     {index + 1}
                   </div>
