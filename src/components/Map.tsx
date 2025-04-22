@@ -413,6 +413,18 @@ const Map: React.FC = () => {
           });
 
           map.current?.addLayer({
+            id: 'saved-polygons-glow',
+            type: 'line',
+            source: 'saved-polygons',
+            paint: {
+              'line-color': '#000000',
+              'line-width': 8,
+              'line-opacity': 0.4,
+              'line-blur': 3
+            }
+          });
+
+          map.current?.addLayer({
             id: 'saved-polygons-layer',
             type: 'fill',
             source: 'saved-polygons',
@@ -423,8 +435,7 @@ const Map: React.FC = () => {
                 '#3498db',
                 '#1a365d'
               ],
-              'fill-opacity': 0.2,
-              'fill-outline-color': '#ffffff'
+              'fill-opacity': 0.4
             }
           });
 
@@ -432,10 +443,6 @@ const Map: React.FC = () => {
             id: 'saved-polygons-outline',
             type: 'line',
             source: 'saved-polygons',
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round'
-            },
             paint: {
               'line-color': [
                 'case',
@@ -443,26 +450,10 @@ const Map: React.FC = () => {
                 '#3498db',
                 '#ffffff'
               ],
-              'line-width': 4,
-              'line-opacity': 0.9
+              'line-width': 3,
+              'line-opacity': 1
             }
           });
-
-          map.current?.addLayer({
-            id: 'saved-polygons-glow',
-            type: 'line',
-            source: 'saved-polygons',
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round'
-            },
-            paint: {
-              'line-color': '#000000',
-              'line-width': 6,
-              'line-opacity': 0.3,
-              'line-blur': 3
-            }
-          }, 'saved-polygons-outline');
 
           map.current?.addLayer({
             id: 'length-labels',
@@ -815,7 +806,8 @@ const Map: React.FC = () => {
         properties: {
           id: polygonId,
           area,
-          perimeter
+          perimeter,
+          selected: true  // Add selected property
         },
         geometry: {
           type: 'Polygon',
@@ -823,17 +815,36 @@ const Map: React.FC = () => {
         }
       } as GeoJSON.Feature;
       
+      // Add feature before clearing drawing state
       addFeature(polygonFeature);
       
+      // Update map source directly for immediate visibility
+      const source = map.current?.getSource('saved-polygons') as mapboxgl.GeoJSONSource;
+      if (source) {
+        const currentFeatures = drawnFeatures.map(f => ({
+          ...f,
+          properties: {
+            ...(f.properties || {}),
+            id: f.id
+          }
+        }));
+          
+        source.setData({
+          type: 'FeatureCollection',
+          features: [...currentFeatures, polygonFeature]
+        });
+      }
+        
       setSelectedFeatureId(polygonId);
       setMeasurementResults({ area, perimeter });
-      
+        
       toast.success(`Polygon erstellt: ${area.toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
-      
+        
+      // Clear drawing state after successful feature addition
       drawRef.current.currentMarkers.forEach(marker => marker.remove());
       drawRef.current.currentMarkers = [];
       drawRef.current.currentPoints = [];
-      
+        
       if (drawRef.current.currentLineSource) {
         drawRef.current.currentLineSource.setData({
           type: 'Feature',
@@ -855,10 +866,10 @@ const Map: React.FC = () => {
           }
         });
       }
-      
+        
       updateAllPolygonLabels();
       updateAllAreaLabels();
-      
+        
       return true;
     } catch (error) {
       console.error('Error completing polygon:', error);
@@ -952,23 +963,4 @@ const Map: React.FC = () => {
       {mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-red-500 bg-opacity-20 z-10">
           <div className="bg-white p-4 rounded-md shadow-lg max-w-md">
-            <h3 className="text-lg font-medium text-red-600">Fehler</h3>
-            <p className="mt-2 text-gray-700">{mapError}</p>
-          </div>
-        </div>
-      )}
-
-      {message && (
-        <div className="absolute top-3 left-3 right-3 z-10">
-          <div className="bg-white p-3 rounded-md shadow-lg border border-border">
-            <p className="text-sm">{message}</p>
-          </div>
-        </div>
-      )}
-
-      <div ref={mapContainer} className="h-full w-full"></div>
-    </div>
-  );
-};
-
-export default Map;
+            <h3 className="
