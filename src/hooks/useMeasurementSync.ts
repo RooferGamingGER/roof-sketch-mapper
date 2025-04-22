@@ -9,7 +9,8 @@ export const useMeasurementSync = () => {
     addMeasurement, 
     updateMeasurement, 
     allMeasurements,
-    deleteMeasurement
+    deleteMeasurement,
+    updateFeature
   } = useMapContext();
 
   useEffect(() => {
@@ -40,17 +41,39 @@ export const useMeasurementSync = () => {
             const coordinates = feature.geometry.coordinates[0];
             const { area, perimeter } = calculateMeasurements(coordinates);
             
-            if (currentMeasurementIds.has(id)) {
-              // Update existing measurement
-              const existingMeasurement = allMeasurements.find(m => m.id === id);
-              if (existingMeasurement && 
-                  (Math.abs(existingMeasurement.area - area) > 0.01 || 
-                   Math.abs(existingMeasurement.perimeter - perimeter) > 0.01)) {
+            // Check if measurement exists
+            const existingMeasurementIndex = allMeasurements.findIndex(m => m.id === id);
+            
+            if (existingMeasurementIndex !== -1) {
+              // Update existing measurement with a very small tolerance (0.001)
+              const existingMeasurement = allMeasurements[existingMeasurementIndex];
+              if (Math.abs(existingMeasurement.area - area) > 0.001 || 
+                  Math.abs(existingMeasurement.perimeter - perimeter) > 0.001) {
                 updateMeasurement(id, area, perimeter);
               }
             } else {
               // Add new measurement
               addMeasurement(id, area, perimeter);
+            }
+            
+            // Ensure feature properties are always up-to-date
+            if (!feature.properties || 
+                !feature.properties.area || 
+                !feature.properties.perimeter ||
+                Math.abs(feature.properties.area - area) > 0.001 || 
+                Math.abs(feature.properties.perimeter - perimeter) > 0.001) {
+              
+              const updatedFeature = {
+                ...feature,
+                properties: {
+                  ...(feature.properties || {}),
+                  area,
+                  perimeter
+                }
+              };
+              
+              // Update the feature in the context to ensure properties are always current
+              updateFeature(id, updatedFeature);
             }
           }
         });
@@ -60,5 +83,5 @@ export const useMeasurementSync = () => {
     };
     
     syncMeasurements();
-  }, [drawnFeatures, addMeasurement, updateMeasurement, deleteMeasurement, allMeasurements]);
+  }, [drawnFeatures, addMeasurement, updateMeasurement, deleteMeasurement, allMeasurements, updateFeature]);
 };

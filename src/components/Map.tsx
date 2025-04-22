@@ -50,7 +50,8 @@ const Map: React.FC = () => {
     updateFeature,
     selectedFeatureId,
     setSelectedFeatureId,
-    setMeasurementResults
+    setMeasurementResults,
+    deleteFeature
   } = useMapContext();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -125,6 +126,13 @@ const Map: React.FC = () => {
       if (feature.geometry.type === 'Polygon') {
         const coords = feature.geometry.coordinates[0];
         const labels = generateLengthLabels(coords as Position[]);
+        
+        labels.features.forEach(label => {
+          if (label.properties) {
+            label.properties.parentId = feature.id;
+          }
+        });
+        
         allLabelFeatures.push(...labels.features);
       }
     });
@@ -477,7 +485,7 @@ const Map: React.FC = () => {
               'symbol-placement': 'point',
               'text-font': ['Open Sans Regular']
             }
-          });
+          }, 'saved-polygons-layer');
 
           map.current?.addLayer({
             id: 'temp-labels',
@@ -499,7 +507,7 @@ const Map: React.FC = () => {
               'text-halo-color': '#e67e22',
               'text-halo-width': 2
             }
-          });
+          }, 'length-labels');
 
           map.current?.on('click', 'saved-polygons-layer', (e) => {
             if (e.features && e.features.length > 0) {
@@ -721,18 +729,30 @@ const Map: React.FC = () => {
         
         source.setData(featureCollection);
         
-        if (map.current && map.current.isStyleLoaded()) {
-          map.current.triggerRepaint();
-        }
-        
-        updateAllPolygonLabels();
-        updateAllAreaLabels();
+        setTimeout(() => {
+          updateAllPolygonLabels();
+          updateAllAreaLabels();
+        }, 50);
       }
     } catch (error) {
       console.error('Error updating polygon source:', error);
       toast.error('Problem bei der Aktualisierung der Polygone');
     }
   }, [drawnFeatures, selectedFeatureId]);
+
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedFeatureId && document.activeElement?.tagName !== 'INPUT') {
+        deleteFeature(selectedFeatureId);
+        toast.success('Polygon gelöscht');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [selectedFeatureId, deleteFeature]);
 
   const resetCurrentDraw = () => {
     drawRef.current.currentPoints = [];

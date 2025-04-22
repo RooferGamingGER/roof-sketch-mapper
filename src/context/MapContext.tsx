@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, ReactNode } from 'react';
 import * as turf from '@turf/turf';
 import { MAPBOX_TOKEN } from '../config/mapbox';
@@ -12,7 +13,7 @@ interface Measurement {
 }
 
 interface MapContextType {
-  mapboxToken: string;  // We keep this for compatibility
+  mapboxToken: string;
   drawMode: DrawMode;
   setDrawMode: (mode: DrawMode) => void;
   selectedAddress: string | null;
@@ -75,10 +76,25 @@ export const MapProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setSelectedFeatureId(null);
     setMeasurementResults({ area: null, perimeter: null });
     setAllMeasurements([]);
+    
+    // Force redraw by temporarily changing draw mode
+    setDrawMode(prevMode => {
+      if (prevMode !== null) {
+        const currentMode = prevMode;
+        setTimeout(() => setDrawMode(currentMode), 50);
+        return null;
+      }
+      return prevMode;
+    });
   };
 
   const addMeasurement = (id: string, area: number, perimeter: number) => {
-    setAllMeasurements(prev => [...prev, { id, area, perimeter }]);
+    setAllMeasurements(prev => {
+      // Check if measurement already exists to avoid duplicates
+      const exists = prev.some(m => m.id === id);
+      if (exists) return prev;
+      return [...prev, { id, area, perimeter }];
+    });
   };
 
   const updateMeasurement = (id: string, area: number, perimeter: number) => {

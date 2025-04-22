@@ -12,13 +12,13 @@ import {
 import { Ruler, MapPin } from 'lucide-react';
 
 const MeasurementsSidebar = () => {
-  const { allMeasurements } = useMapContext();
+  const { allMeasurements, selectedFeatureId, setSelectedFeatureId } = useMapContext();
 
   return (
     <div className="bg-white rounded-md border border-border shadow-sm p-4">
       <div className="flex items-center gap-2 mb-3">
         <Ruler className="h-4 w-4" />
-        <span className="font-medium">Alle Messungsergebnisse</span>
+        <span className="font-medium">Alle Messungsergebnisse ({allMeasurements.length})</span>
       </div>
       
       {allMeasurements.length > 0 ? (
@@ -32,9 +32,13 @@ const MeasurementsSidebar = () => {
           </TableHeader>
           <TableBody>
             {allMeasurements.map((measurement, index) => (
-              <TableRow key={measurement.id}>
+              <TableRow 
+                key={measurement.id}
+                className={selectedFeatureId === measurement.id ? "bg-blue-50" : ""}
+                onClick={() => setSelectedFeatureId(measurement.id)}
+              >
                 <TableCell className="font-medium">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 cursor-pointer">
                     <MapPin className="h-3.5 w-3.5" />
                     {index + 1}
                   </div>

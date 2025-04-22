@@ -1,3 +1,4 @@
+
 import * as turf from '@turf/turf';
 import mapboxgl from 'mapbox-gl';
 import { Position } from 'geojson';
@@ -71,7 +72,8 @@ export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCo
       properties: {
         length: `${distance.toFixed(1)} m`,
         index: i,
-        bearing: bearing
+        bearing: bearing,
+        importance: 1 // Higher importance for rendering priority
       },
       geometry: {
         type: 'Point',
@@ -87,6 +89,7 @@ export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCo
     const lastPoint = coordinates[coordinates.length - 1];
     const isClosedPolygon = firstPoint[0] === lastPoint[0] && firstPoint[1] === lastPoint[1];
     
+    // If the polygon isn't explicitly closed, handle the implicit closing segment
     if (isClosedPolygon) {
       // The segment between the second-to-last and first point (skipping duplicate at the end)
       const start = coordinates[coordinates.length - 2];
@@ -102,7 +105,32 @@ export function generateLengthLabels(coordinates: Position[]): GeoJSON.FeatureCo
           properties: {
             length: `${distance.toFixed(1)} m`,
             index: coordinates.length - 1,
-            bearing: bearing
+            bearing: bearing,
+            importance: 1 // Higher importance for rendering priority
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: midpoint
+          }
+        });
+      }
+    } else {
+      // Handle implicit closing segment between last and first point
+      const start = coordinates[coordinates.length - 1];
+      const end = coordinates[0];
+      const distance = getDistance(start, end);
+      
+      if (distance >= 0.1) {
+        const midpoint = getMidpoint(start, end);
+        const bearing = getBearing(start, end);
+        
+        features.push({
+          type: 'Feature',
+          properties: {
+            length: `${distance.toFixed(1)} m`,
+            index: coordinates.length - 1,
+            bearing: bearing,
+            importance: 1 // Higher importance for rendering priority
           },
           geometry: {
             type: 'Point',
