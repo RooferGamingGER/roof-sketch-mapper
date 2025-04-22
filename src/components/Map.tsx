@@ -807,7 +807,7 @@ const Map: React.FC = () => {
           id: polygonId,
           area,
           perimeter,
-          selected: true  // Add selected property
+          selected: true
         },
         geometry: {
           type: 'Polygon',
@@ -815,10 +815,8 @@ const Map: React.FC = () => {
         }
       } as GeoJSON.Feature;
       
-      // Add feature before clearing drawing state
       addFeature(polygonFeature);
       
-      // Update map source directly for immediate visibility
       const source = map.current?.getSource('saved-polygons') as mapboxgl.GeoJSONSource;
       if (source) {
         const currentFeatures = drawnFeatures.map(f => ({
@@ -840,7 +838,6 @@ const Map: React.FC = () => {
         
       toast.success(`Polygon erstellt: ${area.toFixed(2)} m², Umfang: ${perimeter.toFixed(2)} m`);
         
-      // Clear drawing state after successful feature addition
       drawRef.current.currentMarkers.forEach(marker => marker.remove());
       drawRef.current.currentMarkers = [];
       drawRef.current.currentPoints = [];
@@ -963,4 +960,23 @@ const Map: React.FC = () => {
       {mapError && (
         <div className="absolute inset-0 flex items-center justify-center bg-red-500 bg-opacity-20 z-10">
           <div className="bg-white p-4 rounded-md shadow-lg max-w-md">
-            <h3 className="
+            <h3 className="text-lg font-medium text-red-600">Fehler</h3>
+            <p className="mt-2 text-gray-700">{mapError}</p>
+          </div>
+        </div>
+      )}
+
+      {message && (
+        <div className="absolute top-3 left-3 right-3 z-10">
+          <div className="bg-white p-3 rounded-md shadow-lg border border-border">
+            <p className="text-sm">{message}</p>
+          </div>
+        </div>
+      )}
+
+      <div ref={mapContainer} className="h-full w-full"></div>
+    </div>
+  );
+};
+
+export default Map;
